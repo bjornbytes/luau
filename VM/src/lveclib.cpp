@@ -6,27 +6,56 @@
 
 #include <math.h>
 
-static int vector_create(lua_State* L)
+static void v_rotate(const float* v, const float* q, float* out)
 {
-    // checking argument count to avoid accepting 'nil' as a valid value
-    int count = lua_gettop(L);
+    float u[3] = { q[0], q[1], q[2] };
+    float c[3] = { q[1] * v[2] - q[2] * v[1], q[2] * v[0] - q[0] * v[2], q[0] * v[1] - q[1] * v[0] };
 
-    double x = luaL_checknumber(L, 1);
-    double y = luaL_checknumber(L, 2);
-    double z = count >= 3 ? luaL_checknumber(L, 3) : 0.0;
+    float uu = u[0] * u[0] + u[1] * u[1] + u[2] * u[2];
+    float uv = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+    float s = q[3] * q[3] - uu;
+
+    out[0] = v[0] * s + u[0] * 2.f * uv + c[0] * 2.f * q[3];
+    out[1] = v[1] * s + u[1] * 2.f * uv + c[1] * 2.f * q[3];
+    out[2] = v[2] * s + u[2] * 2.f * uv + c[2] * 2.f * q[3];
+}
+
+static int vector_pack(lua_State* L)
+{
+    int count = lua_gettop(L);
+    count = count < 4 ? count : 4;
+
+    double v[4] = { 0 };
+
+    for (int i = 0; i < count; i++) {
+      v[i] = luaL_checknumber(L, i + 1);
+    }
 
 #if LUA_VECTOR_SIZE == 4
-    double w = count >= 4 ? luaL_checknumber(L, 4) : 0.0;
-
-    lua_pushvector(L, float(x), float(y), float(z), float(w));
+    lua_pushvector(L, float(v[0]), float(v[1]), float(v[2]), float(v[3]));
 #else
-    lua_pushvector(L, float(x), float(y), float(z));
+    lua_pushvector(L, float(v[0]), float(v[1]), float(v[2]));
 #endif
 
     return 1;
 }
 
-static int vector_magnitude(lua_State* L)
+static int vector_unpack(lua_State* L)
+{
+    const float* v = luaL_checkvector(L, 1);
+
+    lua_pushnumber(L, v[0]);
+    lua_pushnumber(L, v[1]);
+    lua_pushnumber(L, v[2]);
+#if LUA_VECTOR_SIZE == 4
+    lua_pushnumber(L, v[3]);
+    return 4;
+#else
+    return 3;
+#endif
+}
+
+static int vector_length(lua_State* L)
 {
     const float* v = luaL_checkvector(L, 1);
 
@@ -51,6 +80,25 @@ static int vector_normalize(lua_State* L)
     float invSqrt = 1.0f / sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 
     lua_pushvector(L, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt);
+#endif
+
+    return 1;
+}
+
+static int vector_distance(lua_State* L)
+{
+    const float* a = luaL_checkvector(L, 1);
+    const float* b = luaL_checkvector(L, 2);
+
+    float dx = a[0] - b[0];
+    float dy = a[1] - b[1];
+    float dz = a[2] - b[2];
+
+#if LUA_VECTOR_SIZE == 4
+    float dw = a[3] - b[3];
+    lua_pushnumber(L, sqrtf(dx * dx + dy * dy + dz * dz + dw * dw));
+#else
+    lua_pushnumber(L, sqrtf(dx * dx + dy * dy + dz * dz));
 #endif
 
     return 1;
@@ -256,37 +304,283 @@ static int vector_max(lua_State* L)
     return 1;
 }
 
-static int vector_index(lua_State* L)
+static int vector_lerp(lua_State* L)
 {
-    const float* v = luaL_checkvector(L, 1);
-    size_t namelen = 0;
-    const char* name = luaL_checklstring(L, 2, &namelen);
+    const float* a = luaL_checkvector(L, 1);
+    const float* b = luaL_checkvector(L, 2);
+    float t = luaL_checknumber(L, 3);
 
-    // field access implementation mirrors the fast-path we have in the VM
-    if (namelen == 1)
-    {
-        int ic = (name[0] | ' ') - 'x';
+    float x = a[0] + (b[0] - a[0]) * t;
+    float y = a[1] + (b[1] - a[1]) * t;
+    float z = a[2] + (b[2] - a[2]) * t;
 
 #if LUA_VECTOR_SIZE == 4
-        // 'w' is before 'x' in ascii, so ic is -1 when indexing with 'w'
-        if (ic == -1)
-            ic = 3;
+    float w = a[3] + (b[3] - a[3]) * t;
+    lua_pushvector(L, x, y, z, w);
+#else
+    lua_pushvector(L, x, y, z);
 #endif
 
-        if (unsigned(ic) < LUA_VECTOR_SIZE)
-        {
-            lua_pushnumber(L, v[ic]);
-            return 1;
-        }
+    return 1;
+}
+
+#if LUA_VECTOR_SIZE == 4
+
+static int vector_rotate(lua_State* L)
+{
+    const float* v = luaL_checkvector(L, 1);
+    const float* q = luaL_checkvector(L, 2);
+
+    float u[3];
+    v_rotate(v, q, u);
+
+#if LUA_VECTOR_SIZE == 4
+    lua_pushvector(L, u[0], u[1], u[2], 0.f);
+#else
+    lua_pushvector(L, u[0], u[1], u[2]);
+#endif
+
+    return 1;
+}
+
+static int vector_angleaxis(lua_State* L)
+{
+    float angle = luaL_checknumber(L, 1);
+    float ax = luaL_checknumber(L, 2); // TODO vector axis
+    float ay = luaL_checknumber(L, 3);
+    float az = luaL_checknumber(L, 4);
+
+    float s = sinf(angle * .5f);
+    float c = cosf(angle * .5f);
+    float length = sqrtf(ax * ax + ay * ay + az * az);
+    if (length > 0.f) s /= length;
+
+    lua_pushvector(L, s * ax, s * ay, s * az, c);
+    return 1;
+}
+
+static int vector_toangleaxis(lua_State* L)
+{
+    const float* q = luaL_checkvector(L, 1);
+    float s = sqrtf(1.f - q[3] * q[3]);
+    s = s < .0001f ? 1.f : 1.f / s;
+    lua_pushnumber(L, 2.f * acosf(q[3]));
+    lua_pushnumber(L, q[0] * s);
+    lua_pushnumber(L, q[1] * s);
+    lua_pushnumber(L, q[2] * s);
+    return 4;
+}
+
+static int vector_between(lua_State* L)
+{
+    const float* a = luaL_checkvector(L, 1);
+    const float* b = luaL_checkvector(L, 2);
+
+    float dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+    if (dot > .99999f || dot < -.99999f) {
+      lua_pushvector(L, 0.f, 0.f, 0.f, 1.f);
+      return 1;
     }
 
-    luaL_error(L, "attempt to index vector with '%s'", name);
+    float x = a[1] * b[2] - a[2] * b[1];
+    float y = a[2] * b[0] - a[0] * b[2];
+    float z = a[0] * b[1] - a[1] * b[0];
+    float w = 1.f + dot;
+
+    lua_pushvector(L, x, y, z, w);
+
+    return 1;
+}
+
+static int vector_lookat(lua_State* L)
+{
+    const float* from = luaL_checkvector(L, 1);
+    const float* to = luaL_checkvector(L, 2);
+    float yup[4] = { 0.f, 1.f, 0.f, 0.f };
+    const float* up = luaL_optvector(L, 3, yup);
+
+    float Z[3] = { to[0] - from[0], to[1] - from[1], to[2] - from[2] };
+    float length = sqrtf(Z[0] * Z[0] + Z[1] * Z[1] + Z[2] * Z[2]);
+
+    if (length == 0.f) {
+        lua_pushvector(L, 0.f, 0.f, 0.f, 1.f);
+        return 1;
+    }
+
+    Z[0] /= length;
+    Z[1] /= length;
+    Z[2] /= length;
+
+    float X[3] = { Z[1] * up[2] - Z[2] * up[1], Z[2] * up[0] - Z[0] * up[2], Z[0] * up[1] - Z[1] * up[0] };
+    length = sqrtf(X[0] * X[0] + X[1] * X[1] + X[2] * X[2]);
+
+    if (length == 0.f) {
+      if (fabs(Z[0]) < .9f) {
+        X[0] = 0.f;
+        X[1] = Z[2];
+        X[2] = -Z[1];
+      } else {
+        X[0] = Z[2];
+        X[1] = 0.f;
+        X[2] = -Z[0];
+      }
+
+      length = sqrtf(X[0] * X[0] + X[1] * X[1] + X[2] * X[2]);
+    }
+
+    X[0] /= length;
+    X[1] /= length;
+    X[2] /= length;
+
+    float Y[3] = { X[1] * Z[2] - X[2] * Z[1], X[2] * Z[0] - X[0] * Z[2], X[0] * Z[1] - X[1] * Z[0] };
+
+    float m00 = X[0], m01 = Y[0], m02 = Z[0];
+    float m10 = X[1], m11 = Y[1], m12 = Z[1];
+    float m20 = X[2], m21 = Y[2], m22 = Z[2];
+
+    if (m22 < 0.f) {
+      if (m00 > m11) {
+        float t = 1.f + m00 - m11 - m22;
+        float s = .5f / sqrtf(t);
+        lua_pushvector(L, t * s, (m01 + m10) * s, (m20 + m02) * s, (m12 - m21) * s);
+      } else {
+        float t = 1.f - m00 + m11 - m22;
+        float s = .5f / sqrtf(t);
+        lua_pushvector(L, (m01 + m10) * s, t * s, (m12 + m21) * s, (m20 - m02) * s);
+      }
+    } else {
+      if (m00 < -m11) {
+        float t = 1.f - m00 - m11 + m22;
+        float s = .5f / sqrtf(t);
+        lua_pushvector(L, (m20 + m02) * s, (m12 + m21) * s, t * s, (m01 - m10) * s);
+      } else {
+        float t = 1.f + m00 + m11 + m22;
+        float s = .5f / sqrtf(t);
+        lua_pushvector(L, (m12 - m21) * s, (m20 - m02) * s, (m01 - m10) * s, t * s);
+      }
+    }
+
+    return 1;
+}
+
+static int vector_compose(lua_State* L)
+{
+    const float* q = luaL_checkvector(L, 1);
+    const float* r = luaL_checkvector(L, 2);
+
+    float x = q[0] * r[3] + q[3] * r[0] + q[1] * r[2] - q[2] * r[1];
+    float y = q[1] * r[3] + q[3] * r[1] + q[2] * r[0] - q[0] * r[2];
+    float z = q[2] * r[3] + q[3] * r[2] + q[0] * r[1] - q[1] * r[0];
+    float w = q[3] * r[3] - q[0] * r[0] - q[1] * r[1] - q[2] * r[2];
+
+    lua_pushvector(L, x, y, z, w);
+
+    return 1;
+}
+
+static int vector_conjugate(lua_State* L)
+{
+    const float* q = luaL_checkvector(L, 1);
+    lua_pushvector(L, -q[0], -q[1], -q[2], q[3]);
+    return 1;
+}
+
+static int vector_slerp(lua_State* L)
+{
+    const float* q = luaL_checkvector(L, 1);
+    const float* r = luaL_checkvector(L, 2);
+    float t = luaL_checknumber(L, 3);
+
+    float dot = q[0] * r[0] + q[1] * r[1] + q[2] * r[2] + q[3] * r[3];
+
+    if (fabsf(dot) >= 1.f) {
+      lua_settop(L, 1);
+      return 1;
+    }
+
+    float s = 1.f;
+
+    if (dot < 0.f) {
+      dot *= -1.f;
+      s = -1.f;
+    }
+
+    float halfTheta = acosf(dot);
+    float sinHalfTheta = sqrtf(1.f - dot * dot);
+
+    if (fabsf(sinHalfTheta) < .001f) {
+      float x = s * q[0] * .5f + r[0] * .5f;
+      float y = s * q[1] * .5f + r[1] * .5f;
+      float z = s * q[2] * .5f + r[2] * .5f;
+      float w = s * q[3] * .5f + r[3] * .5f;
+      lua_pushvector(L, x, y, z, w);
+      return 1;
+    }
+
+    float a = sinf((1.f - t) * halfTheta) / sinHalfTheta;
+    float b = sinf(t * halfTheta) / sinHalfTheta;
+
+    float x = s * q[0] * a + r[0] * b;
+    float y = s * q[1] * a + r[1] * b;
+    float z = s * q[2] * a + r[2] * b;
+    float w = s * q[3] * a + r[3] * b;
+    lua_pushvector(L, x, y, z, w);
+    return 1;
+}
+
+static int vector_direction(lua_State* L)
+{
+    const float* q = luaL_checkvector(L, 1);
+    float x = -2.f * q[0] * q[2] - 2.f * q[3] * q[1];
+    float y = -2.f * q[1] * q[2] + 2.f * q[3] * q[0];
+    float z = -1.f + 2.f * q[0] * q[0] + 2.f * q[1] * q[1];
+    lua_pushvector(L, x, y, z, 0.f);
+    return 1;
+}
+
+static int vector_toworld(lua_State* L)
+{
+    const float* v = luaL_checkvector(L, 1);
+    const float* p = luaL_checkvector(L, 2);
+    const float* q = luaL_checkvector(L, 3);
+
+    float u[3];
+    v_rotate(v, q, u);
+
+    lua_pushvector(L, p[0] + u[0], p[1] + u[1], p[2] + u[2], 0.f);
+    return 1;
+}
+
+static int vector_tolocal(lua_State* L)
+{
+    const float* v = luaL_checkvector(L, 1);
+    const float* p = luaL_checkvector(L, 2);
+    const float* q = luaL_checkvector(L, 3);
+
+    float r[4] = { -q[0], -q[1], -q[2], q[3] };
+
+    float u[3];
+    v_rotate(v, r, u);
+
+    lua_pushvector(L, u[0] - p[0], u[1] - p[1], u[2] - p[2], 0.f);
+    return 1;
+}
+
+#endif
+
+static int vector_call(lua_State* L)
+{
+    lua_remove(L, 1);
+    return vector_pack(L);
 }
 
 static const luaL_Reg vectorlib[] = {
-    {"create", vector_create},
-    {"magnitude", vector_magnitude},
+    {"pack", vector_pack},
+    {"unpack", vector_unpack},
+    {"length", vector_length},
     {"normalize", vector_normalize},
+    {"distance", vector_distance},
     {"cross", vector_cross},
     {"dot", vector_dot},
     {"angle", vector_angle},
@@ -295,14 +589,37 @@ static const luaL_Reg vectorlib[] = {
     {"abs", vector_abs},
     {"sign", vector_sign},
     {"clamp", vector_clamp},
-    {"max", vector_max},
     {"min", vector_min},
+    {"max", vector_max},
+    {"lerp", vector_lerp},
+
+#if LUA_VECTOR_SIZE == 4
+    {"rotate", vector_rotate},
+    {"angleaxis", vector_angleaxis},
+    {"toangleaxis", vector_toangleaxis},
+    {"between", vector_between},
+    {"lookat", vector_lookat},
+    {"compose", vector_compose},
+    {"conjugate", vector_conjugate},
+    {"slerp", vector_slerp},
+    {"direction", vector_direction},
+
+    {"toworld", vector_toworld},
+    {"tolocal", vector_tolocal},
+#endif
+
     {NULL, NULL},
 };
 
-static void createmetatable(lua_State* L)
+int luaopen_vector(lua_State* L)
 {
-    lua_createtable(L, 0, 1); // create metatable for vectors
+    luaL_register(L, LUA_VECLIBNAME, vectorlib);
+
+    // make vector library callable
+    lua_newtable(L);
+    lua_pushcfunction(L, vector_call, nullptr);
+    lua_setfield(L, -2, "__call");
+    lua_setmetatable(L, -2);
 
     // push dummy vector
 #if LUA_VECTOR_SIZE == 4
@@ -311,20 +628,12 @@ static void createmetatable(lua_State* L)
     lua_pushvector(L, 0.0f, 0.0f, 0.0f);
 #endif
 
-    lua_pushvalue(L, -2);
+    lua_pushvalue(L, -2); // push the vector library
     lua_setmetatable(L, -2); // set vector metatable
-    lua_pop(L, 1);           // pop dummy vector
+    lua_pop(L, 1); // pop dummy vector
 
-    lua_pushcfunction(L, vector_index, nullptr);
+    lua_pushvalue(L, -1); // vector.__index = vector
     lua_setfield(L, -2, "__index");
-
-    lua_setreadonly(L, -1, true);
-    lua_pop(L, 1); // pop the metatable
-}
-
-int luaopen_vector(lua_State* L)
-{
-    luaL_register(L, LUA_VECLIBNAME, vectorlib);
 
 #if LUA_VECTOR_SIZE == 4
     lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -337,8 +646,6 @@ int luaopen_vector(lua_State* L)
     lua_pushvector(L, 1.0f, 1.0f, 1.0f);
     lua_setfield(L, -2, "one");
 #endif
-
-    createmetatable(L);
 
     return 1;
 }
