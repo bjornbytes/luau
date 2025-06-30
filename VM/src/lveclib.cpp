@@ -539,34 +539,6 @@ static int vector_direction(lua_State* L)
     return 1;
 }
 
-static int vector_toworld(lua_State* L)
-{
-    const float* v = luaL_checkvector(L, 1);
-    const float* p = luaL_checkvector(L, 2);
-    const float* q = luaL_checkvector(L, 3);
-
-    float u[3];
-    v_rotate(v, q, u);
-
-    lua_pushvector(L, p[0] + u[0], p[1] + u[1], p[2] + u[2], 0.f);
-    return 1;
-}
-
-static int vector_tolocal(lua_State* L)
-{
-    const float* v = luaL_checkvector(L, 1);
-    const float* p = luaL_checkvector(L, 2);
-    const float* q = luaL_checkvector(L, 3);
-
-    float r[4] = { -q[0], -q[1], -q[2], q[3] };
-
-    float u[3];
-    v_rotate(v, r, u);
-
-    lua_pushvector(L, u[0] - p[0], u[1] - p[1], u[2] - p[2], 0.f);
-    return 1;
-}
-
 #endif
 
 static int vector_call(lua_State* L)
@@ -603,9 +575,6 @@ static const luaL_Reg vectorlib[] = {
     {"conjugate", vector_conjugate},
     {"slerp", vector_slerp},
     {"direction", vector_direction},
-
-    {"toworld", vector_toworld},
-    {"tolocal", vector_tolocal},
 #endif
 
     {NULL, NULL},
