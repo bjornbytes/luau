@@ -371,6 +371,59 @@ static int vector_toangleaxis(lua_State* L)
     return 4;
 }
 
+static int vector_euler(lua_State* L)
+{
+  float x = luaL_checknumber(L, 1);
+  float y = luaL_checknumber(L, 2);
+  float z = luaL_checknumber(L, 3);
+
+  float cx = cosf(x * .5f);
+  float sx = sinf(x * .5f);
+  float cy = cosf(y * .5f);
+  float sy = sinf(y * .5f);
+  float cz = cosf(z * .5f);
+  float sz = sinf(z * .5f);
+
+  lua_pushvector(L,
+    cy * sx * cz + sy * cx * sz,
+    sy * cx * cz - cy * sx * sz,
+    cy * cx * sz - sy * sx * cz,
+    cy * cx * cz + sy * sx * sz
+  );
+
+  return 1;
+}
+
+static int vector_toeuler(lua_State* L)
+{
+  const float* q = luaL_checkvector(L, 1);
+
+  float unit = (q[0] * q[0]) + (q[1] * q[1]) + (q[2] * q[2]) + (q[3] * q[3]);
+  float test = q[0] * q[3] - q[1] * q[2];
+  const float eps = 1e-7f;
+
+  float x, y, z;
+
+  if (test > (.5f - eps) * unit) {
+    x = (float) M_PI / 2.f;
+    y = 2.f * atan2f(q[1], q[0]);
+    z = 0.f;
+  } else if (test < -(.5f - eps) * unit) {
+    x = (float) -M_PI / 2.f;
+    y = -2.f * atan2f(q[1], q[0]);
+    z = 0.f;
+  } else {
+    x = asinf(2.f * (q[3] * q[0] - q[1] * q[2]));
+    y = atan2f(2.f * q[3] * q[1] + 2.f * q[2] * q[0], 1.f - 2.f * (q[0] * q[0] + q[1] * q[1]));
+    z = atan2f(2.f * q[3] * q[2] + 2.f * q[0] * q[1], 1.f - 2.f * (q[2] * q[2] + q[0] * q[0]));
+  }
+
+  lua_pushnumber(L, x);
+  lua_pushnumber(L, y);
+  lua_pushnumber(L, z);
+  return 3;
+}
+
 static int vector_between(lua_State* L)
 {
     const float* a = luaL_checkvector(L, 1);
@@ -569,6 +622,8 @@ static const luaL_Reg vectorlib[] = {
     {"rotate", vector_rotate},
     {"angleaxis", vector_angleaxis},
     {"toangleaxis", vector_toangleaxis},
+    {"euler", vector_euler},
+    {"toeuler", vector_toeuler},
     {"between", vector_between},
     {"lookat", vector_lookat},
     {"compose", vector_compose},
