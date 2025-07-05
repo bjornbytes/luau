@@ -446,14 +446,12 @@ static int vector_between(lua_State* L)
     return 1;
 }
 
-static int vector_lookat(lua_State* L)
+static int vector_lookdir(lua_State* L)
 {
-    const float* from = luaL_checkvector(L, 1);
-    const float* to = luaL_checkvector(L, 2);
-    float yup[4] = { 0.f, 1.f, 0.f, 0.f };
-    const float* up = luaL_optvector(L, 3, yup);
+    const float* dir = luaL_checkvector(L, 1);
+    const float* up = luaL_optvector(L, 2, (float[3]) { 0.f, 1.f, 0.f });
 
-    float Z[3] = { to[0] - from[0], to[1] - from[1], to[2] - from[2] };
+    float Z[3] = { dir[0], dir[1], dir[2] };
     float length = sqrtf(Z[0] * Z[0] + Z[1] * Z[1] + Z[2] * Z[2]);
 
     if (length == 0.f) {
@@ -600,6 +598,12 @@ static int vector_call(lua_State* L)
     return vector_pack(L);
 }
 
+static int quat_call(lua_State* L)
+{
+    lua_remove(L, 1);
+    return vector_angleaxis(L);
+}
+
 static const luaL_Reg vectorlib[] = {
     {"pack", vector_pack},
     {"unpack", vector_unpack},
@@ -620,12 +624,19 @@ static const luaL_Reg vectorlib[] = {
 
 #if LUA_VECTOR_SIZE == 4
     {"rotate", vector_rotate},
+#endif
+
+    {NULL, NULL},
+};
+
+static const luaL_Reg quatlib[] = {
+#if LUA_VECTOR_SIZE == 4
     {"angleaxis", vector_angleaxis},
     {"toangleaxis", vector_toangleaxis},
     {"euler", vector_euler},
     {"toeuler", vector_toeuler},
     {"between", vector_between},
-    {"lookat", vector_lookat},
+    {"lookdir", vector_lookdir},
     {"compose", vector_compose},
     {"conjugate", vector_conjugate},
     {"slerp", vector_slerp},
@@ -637,27 +648,14 @@ static const luaL_Reg vectorlib[] = {
 
 int luaopen_vector(lua_State* L)
 {
+    // vector
     luaL_register(L, LUA_VECLIBNAME, vectorlib);
 
-    // make vector library callable
+    // vector()
     lua_newtable(L);
     lua_pushcfunction(L, vector_call, nullptr);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
-
-    // push dummy vector
-#if LUA_VECTOR_SIZE == 4
-    lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
-#else
-    lua_pushvector(L, 0.0f, 0.0f, 0.0f);
-#endif
-
-    lua_pushvalue(L, -2); // push the vector library
-    lua_setmetatable(L, -2); // set vector metatable
-    lua_pop(L, 1); // pop dummy vector
-
-    lua_pushvalue(L, -1); // vector.__index = vector
-    lua_setfield(L, -2, "__index");
 
 #if LUA_VECTOR_SIZE == 4
     lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -670,6 +668,32 @@ int luaopen_vector(lua_State* L)
     lua_pushvector(L, 1.0f, 1.0f, 1.0f);
     lua_setfield(L, -2, "one");
 #endif
+
+    // quat
+    luaL_register(L, LUA_QUATLIBNAME, quatlib);
+
+    // quat()
+    lua_newtable(L);
+    lua_pushcfunction(L, quat_call, nullptr);
+    lua_setfield(L, -2, "__call");
+    lua_setmetatable(L, -2);
+
+    // vector metatable
+    lua_newtable(L);
+    luaL_register(L, NULL, vectorlib);
+    luaL_register(L, NULL, quatlib);
+
+#if LUA_VECTOR_SIZE == 4
+    lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
+#else
+    lua_pushvector(L, 0.0f, 0.0f, 0.0f);
+#endif
+
+    lua_setmetatable(L, -2); // set vector metatable
+    lua_pop(L, 1); // pop dummy vector
+
+    lua_pushvalue(L, -1); // vectormt.__index = vectormt
+    lua_setfield(L, -2, "__index");
 
     return 1;
 }

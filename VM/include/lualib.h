@@ -140,6 +140,7 @@ LUALIB_API int luaopen_math(lua_State* L);
 LUALIB_API int luaopen_debug(lua_State* L);
 
 #define LUA_VECLIBNAME "vector"
+#define LUA_QUATLIBNAME "quat"
 LUALIB_API int luaopen_vector(lua_State* L);
 
 // open all builtin libraries
