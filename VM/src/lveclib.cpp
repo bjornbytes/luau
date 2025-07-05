@@ -598,11 +598,13 @@ static int vector_call(lua_State* L)
     return vector_pack(L);
 }
 
+#if LUA_VECTOR_SIZE == 4
 static int quat_call(lua_State* L)
 {
     lua_remove(L, 1);
     return vector_angleaxis(L);
 }
+#endif
 
 static const luaL_Reg vectorlib[] = {
     {"pack", vector_pack},
