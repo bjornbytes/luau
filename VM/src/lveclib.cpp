@@ -631,6 +631,10 @@ static const luaL_Reg vectorlib[] = {
 
 static const luaL_Reg quatlib[] = {
 #if LUA_VECTOR_SIZE == 4
+    {"pack", vector_pack},
+    {"unpack", vector_unpack},
+    {"length", vector_length},
+    {"normalize", vector_normalize},
     {"angleaxis", vector_angleaxis},
     {"toangleaxis", vector_toangleaxis},
     {"euler", vector_euler},
