@@ -695,11 +695,11 @@ int luaopen_vector(lua_State* L)
     luaL_register(L, NULL, vectorlib);
     luaL_register(L, NULL, quatlib);
 
-    lua_setmetatable(L, -2); // set vector metatable
-    lua_pop(L, 1); // pop dummy vector
-
     lua_pushvalue(L, -1); // vectormt.__index = vectormt
     lua_setfield(L, -2, "__index");
+
+    lua_setmetatable(L, -2); // set vector metatable
+    lua_pop(L, 1); // pop dummy vector
 
     return 1;
 }
