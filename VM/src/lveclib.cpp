@@ -25,10 +25,10 @@ static int vector_pack(lua_State* L)
     int count = lua_gettop(L);
     count = count < 4 ? count : 4;
 
-    double v[4] = { 0 };
+    float v[4] = { 0.f, 0.f, 0.f, 1.f };
 
     for (int i = 0; i < count; i++) {
-      v[i] = luaL_checknumber(L, i + 1);
+      v[i] = float(luaL_checknumber(L, i + 1));
     }
 
 #if LUA_VECTOR_SIZE == 4
