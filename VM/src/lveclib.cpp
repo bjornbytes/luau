@@ -685,15 +685,15 @@ int luaopen_vector(lua_State* L)
     lua_setmetatable(L, -2);
 
     // vector metatable
-    lua_newtable(L);
-    luaL_register(L, NULL, vectorlib);
-    luaL_register(L, NULL, quatlib);
-
 #if LUA_VECTOR_SIZE == 4
     lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
 #else
     lua_pushvector(L, 0.0f, 0.0f, 0.0f);
 #endif
+
+    lua_newtable(L);
+    luaL_register(L, NULL, vectorlib);
+    luaL_register(L, NULL, quatlib);
 
     lua_setmetatable(L, -2); // set vector metatable
     lua_pop(L, 1); // pop dummy vector
