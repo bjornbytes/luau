@@ -132,10 +132,10 @@ typedef struct lua_TValue
     { \
         TValue* i_o = (obj); \
         short* i_q = i_o->value.q; \
-        i_q[0] = (short) (x * 32767.f); \
-        i_q[1] = (short) (y * 32767.f); \
-        i_q[2] = (short) (z * 32767.f); \
-        i_q[3] = (short) (w * 32767.f); \
+        i_q[0] = (short) ((x) * 32767.f); \
+        i_q[1] = (short) ((y) * 32767.f); \
+        i_q[2] = (short) ((z) * 32767.f); \
+        i_q[3] = (short) ((w) * 32767.f); \
         i_o->tt = LUA_TQUATERNION; \
     }
 
