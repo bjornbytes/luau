@@ -500,6 +500,14 @@ const float* lua_tovector(lua_State* L, int idx)
     return vvalue(o);
 }
 
+const short* lua_toquaternion(lua_State* L, int idx)
+{
+    StkId o = index2addr(L, idx);
+    if (!ttisquaternion(o))
+        return NULL;
+    return qvalue(o);
+}
+
 int lua_objlen(lua_State* L, int idx)
 {
     StkId o = index2addr(L, idx);
@@ -645,6 +653,12 @@ void lua_pushvector(lua_State* L, float x, float y, float z)
     api_incr_top(L);
 }
 #endif
+
+void lua_pushquaternion(lua_State* L, float x, float y, float z, float w)
+{
+    setqvalue(L->top, x, y, z, w);
+    api_incr_top(L);
+}
 
 void lua_pushlstring(lua_State* L, const char* s, size_t len)
 {

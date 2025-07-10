@@ -24,6 +24,11 @@ inline bool luai_veceq(const float* a, const float* b)
 #endif
 }
 
+inline bool luai_quateq(const short* a, const short* b)
+{
+    return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
+}
+
 inline bool luai_vecisnan(const float* a)
 {
 #if LUA_VECTOR_SIZE == 4
@@ -36,6 +41,11 @@ inline bool luai_vecisnan(const float* a)
 inline float luaui_signf(float v)
 {
     return v > 0.0f ? 1.0f : v < 0.0f ? -1.0f : 0.0f;
+}
+
+inline float luaui_maxf(float a, float b)
+{
+    return a > b ? a : b;
 }
 
 inline float luaui_clampf(float v, float min, float max)

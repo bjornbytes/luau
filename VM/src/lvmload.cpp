@@ -472,6 +472,16 @@ static int loadsafe(
                 break;
             }
 
+            case LBC_CONSTANT_QUATERNION:
+            {
+                float x = read<float>(data, size, offset);
+                float y = read<float>(data, size, offset);
+                float z = read<float>(data, size, offset);
+                float w = read<float>(data, size, offset);
+                setqvalue(&p->k[j], x, y, z, w);
+                break;
+            }
+
             case LBC_CONSTANT_STRING:
             {
                 TString* v = readString(strings, data, size, offset);

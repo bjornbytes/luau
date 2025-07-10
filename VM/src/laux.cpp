@@ -255,6 +255,19 @@ const float* luaL_optvector(lua_State* L, int narg, const float* def)
     return luaL_opt(L, luaL_checkvector, narg, def);
 }
 
+const short* luaL_checkquaternion(lua_State* L, int narg)
+{
+    const short* q = lua_toquaternion(L, narg);
+    if (!q)
+        tag_error(L, narg, LUA_TQUATERNION);
+    return q;
+}
+
+const short* luaL_optquaternion(lua_State* L, int narg, const short* def)
+{
+    return luaL_opt(L, luaL_checkquaternion, narg, def);
+}
+
 int luaL_getmetafield(lua_State* L, int obj, const char* event)
 {
     if (!lua_getmetatable(L, obj)) // no metatable?
@@ -589,6 +602,24 @@ const char* luaL_tolstring(lua_State* L, int idx, size_t* len)
                 *e++ = ' ';
             }
             e = luai_num2str(e, v[i]);
+        }
+        lua_pushlstring(L, s, e - s);
+        break;
+    }
+    case LUA_TQUATERNION:
+    {
+        const short* q = lua_toquaternion(L, idx);
+
+        char s[LUAI_MAXNUM2STR * 4];
+        char* e = s;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (i != 0)
+            {
+                *e++ = ',';
+                *e++ = ' ';
+            }
+            e = luai_num2str(e, luaui_maxf(q[i] / 32767.f, -1.f));
         }
         lua_pushlstring(L, s, e - s);
         break;

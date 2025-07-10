@@ -154,6 +154,7 @@ private:
             Type_Boolean,
             Type_Number,
             Type_Vector,
+            Type_Quaternion,
             Type_String,
             Type_Import,
             Type_Table,
@@ -166,6 +167,7 @@ private:
             bool valueBoolean;
             double valueNumber;
             float valueVector[4];
+            uint16_t valueQuaternion[4];
             unsigned int valueString; // index into string table
             uint32_t valueImport;     // 10-10-10-2 encoded import id
             uint32_t valueTable;      // index into tableShapes[]

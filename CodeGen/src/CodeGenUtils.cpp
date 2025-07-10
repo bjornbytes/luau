@@ -476,6 +476,44 @@ const Instruction* executeGETTABLEKS(lua_State* L, const Instruction* pc, StkId 
 
             // fall through to slow path
         }
+        else if (ttisquaternion(rb))
+        {
+            // fast-path: quick case-insensitive comparison with "X"/"Y"/"Z"/"W"
+            const char* name = getstr(tsvalue(kv));
+            int ic = (name[0] | ' ') - 'x';
+
+            // 'w' is before 'x' in ascii, so ic is -1 when indexing with 'w'
+            if (ic == -1)
+                ic = 3;
+
+            if (unsigned(ic) < 4 && name[1] == '\0')
+            {
+                const short* q = qvalue(rb); // silences ubsan when indexing v[]
+                setnvalue(ra, luaui_maxf(q[ic] / 32767.f, -1.f));
+                return pc;
+            }
+
+            fn = fasttm(L, L->global->mt[LUA_TQUATERNION], TM_INDEX);
+
+            if (fn && ttisfunction(fn) && clvalue(fn)->isC)
+            {
+                // note: it's safe to push arguments past top for complicated reasons (see top of the file)
+                LUAU_ASSERT(L->top + 3 < L->stack + L->stacksize);
+                StkId top = L->top;
+                setobj2s(L, top + 0, fn);
+                setobj2s(L, top + 1, rb);
+                setobj2s(L, top + 2, kv);
+                L->top = top + 3;
+
+                L->cachedslot = LUAU_INSN_C(insn);
+                VM_PROTECT(luaV_callTM(L, 2, LUAU_INSN_A(insn)));
+                // save cachedslot to accelerate future lookups; patches currently executing instruction since pc-2 rolls back two pc++
+                VM_PATCH_C(pc - 2, L->cachedslot);
+                return pc;
+            }
+
+            // fall through to slow path
+        }
 
         // fall through to slow path
     }

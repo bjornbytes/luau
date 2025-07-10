@@ -792,6 +792,14 @@ void BytecodeBuilder::writeFunction(std::string& ss, uint32_t id, uint8_t flags)
             writeFloat(ss, c.valueVector[3]);
             break;
 
+        case Constant::Type_Quaternion:
+            writeByte(ss, LBC_CONSTANT_QUATERNION);
+            writeFloat(ss, c.valueQuaternion[0]);
+            writeFloat(ss, c.valueQuaternion[1]);
+            writeFloat(ss, c.valueQuaternion[2]);
+            writeFloat(ss, c.valueQuaternion[3]);
+            break;
+
         case Constant::Type_String:
             writeByte(ss, LBC_CONSTANT_STRING);
             writeVarInt(ss, c.valueString);

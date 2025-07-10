@@ -546,6 +546,44 @@ reentry:
 
                         // fall through to slow path
                     }
+                    else if (ttisquaternion(rb))
+                    {
+                        // fast-path: quick case-insensitive comparison with "X"/"Y"/"Z"
+                        const char* name = getstr(tsvalue(kv));
+                        int ic = (name[0] | ' ') - 'x';
+
+                        // 'w' is before 'x' in ascii, so ic is -1 when indexing with 'w'
+                        if (ic == -1)
+                            ic = 3;
+
+                        if (unsigned(ic) < 4 && name[1] == '\0')
+                        {
+                            const short* q = qvalue(rb); // silences ubsan when indexing v[]
+                            setnvalue(ra, luaui_maxf(q[ic] / 32767.f, -1.f));
+                            VM_NEXT();
+                        }
+
+                        fn = fasttm(L, L->global->mt[LUA_TQUATERNION], TM_INDEX);
+
+                        if (fn && ttisfunction(fn) && clvalue(fn)->isC)
+                        {
+                            // note: it's safe to push arguments past top for complicated reasons (see top of the file)
+                            LUAU_ASSERT(L->top + 3 < L->stack + L->stacksize);
+                            StkId top = L->top;
+                            setobj2s(L, top + 0, fn);
+                            setobj2s(L, top + 1, rb);
+                            setobj2s(L, top + 2, kv);
+                            L->top = top + 3;
+
+                            L->cachedslot = LUAU_INSN_C(insn);
+                            VM_PROTECT(luaV_callTM(L, 2, LUAU_INSN_A(insn)));
+                            // save cachedslot to accelerate future lookups; patches currently executing instruction since pc-2 rolls back two pc++
+                            VM_PATCH_C(pc - 2, L->cachedslot);
+                            VM_NEXT();
+                        }
+
+                        // fall through to slow path
+                    }
 
                     // fall through to slow path
                 }
@@ -1123,6 +1161,11 @@ reentry:
                         LUAU_ASSERT(unsigned(pc - cl->l.p->code) < unsigned(cl->l.p->sizecode));
                         VM_NEXT();
 
+                    case LUA_TQUATERNION:
+                        pc += luai_quateq(qvalue(ra), qvalue(rb)) ? LUAU_INSN_D(insn) : 1;
+                        LUAU_ASSERT(unsigned(pc - cl->l.p->code) < unsigned(cl->l.p->sizecode));
+                        VM_NEXT();
+
                     case LUA_TSTRING:
                     case LUA_TFUNCTION:
                     case LUA_TTHREAD:
@@ -1235,6 +1278,11 @@ reentry:
 
                     case LUA_TVECTOR:
                         pc += !luai_veceq(vvalue(ra), vvalue(rb)) ? LUAU_INSN_D(insn) : 1;
+                        LUAU_ASSERT(unsigned(pc - cl->l.p->code) < unsigned(cl->l.p->sizecode));
+                        VM_NEXT();
+
+                    case LUA_TQUATERNION:
+                        pc += !luai_quateq(qvalue(ra), qvalue(rb)) ? LUAU_INSN_D(insn) : 1;
                         LUAU_ASSERT(unsigned(pc - cl->l.p->code) < unsigned(cl->l.p->sizecode));
                         VM_NEXT();
 
@@ -1565,6 +1613,48 @@ reentry:
                     const float* vb = vvalue(rb);
                     const float* vc = vvalue(rc);
                     setvvalue(ra, vb[0] * vc[0], vb[1] * vc[1], vb[2] * vc[2], vb[3] * vc[3]);
+                    VM_NEXT();
+                }
+                else if (ttisquaternion(rb) && ttisvector(rc))
+                {
+                    const short* qb = qvalue(rb);
+                    const float* vc = vvalue(rc);
+                    float qx = luaui_maxf(qb[0] / 32767.f, -1.f);
+                    float qy = luaui_maxf(qb[1] / 32767.f, -1.f);
+                    float qz = luaui_maxf(qb[2] / 32767.f, -1.f);
+                    float qw = luaui_maxf(qb[3] / 32767.f, -1.f);
+                    float cx = qy * vc[2] - qz * vc[1];
+                    float cy = qz * vc[0] - qx * vc[2];
+                    float cz = qx * vc[1] - qy * vc[0];
+
+                    setvvalue(
+                        ra,
+                        float(vc[0] + 2.f * (qy * (cz + qw * vc[2]) - qz * (cy + qw * vc[1]))),
+                        float(vc[1] + 2.f * (qz * (cx + qw * vc[0]) - qx * (cz + qw * vc[2]))),
+                        float(vc[2] + 2.f * (qx * (cy + qw * vc[1]) - qy * (cx + qw * vc[0]))),
+                        0.f
+                    );
+                    VM_NEXT();
+                }
+                else if (ttisquaternion(rb) && ttisquaternion(rc))
+                {
+                    const short* qb = qvalue(rb);
+                    const short* qc = qvalue(rc);
+                    float bx = luaui_maxf(qb[0] / 32767.f, -1.f);
+                    float by = luaui_maxf(qb[1] / 32767.f, -1.f);
+                    float bz = luaui_maxf(qb[2] / 32767.f, -1.f);
+                    float bw = luaui_maxf(qb[3] / 32767.f, -1.f);
+                    float cx = luaui_maxf(qc[0] / 32767.f, -1.f);
+                    float cy = luaui_maxf(qc[1] / 32767.f, -1.f);
+                    float cz = luaui_maxf(qc[2] / 32767.f, -1.f);
+                    float cw = luaui_maxf(qc[3] / 32767.f, -1.f);
+                    setqvalue(
+                        ra,
+                        bx * cw + bw * cx + by * cz - bz * cy,
+                        by * cw + bw * cy + bz * cx - bx * cz,
+                        bz * cw + bw * cz + bx * cy - by * cx,
+                        bw * cw - bx * cx - by * cy - bz * cz
+                    );
                     VM_NEXT();
                 }
                 else if (ttisnumber(rb) && ttisvector(rc))

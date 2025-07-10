@@ -19,6 +19,7 @@ struct Constant
         Type_Boolean,
         Type_Number,
         Type_Vector,
+        Type_Quaternion,
         Type_String,
     };
 
@@ -30,6 +31,7 @@ struct Constant
         bool valueBoolean;
         double valueNumber;
         float valueVector[4];
+        float valueQuaternion[4];
         const char* valueString = nullptr; // length stored in stringLength
     };
 

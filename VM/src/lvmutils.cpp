@@ -285,6 +285,8 @@ int luaV_equalval(lua_State* L, const TValue* t1, const TValue* t2)
         return luai_numeq(nvalue(t1), nvalue(t2));
     case LUA_TVECTOR:
         return luai_veceq(vvalue(t1), vvalue(t2));
+    case LUA_TQUATERNION:
+        return luai_quateq(qvalue(t1), qvalue(t2));
     case LUA_TBOOLEAN:
         return bvalue(t1) == bvalue(t2); // true must be 1 !!
     case LUA_TLIGHTUSERDATA:
@@ -387,7 +389,69 @@ void luaV_doarithimpl(lua_State* L, StkId ra, const TValue* rb, const TValue* rc
     const float* vb = ttisvector(rb) ? vvalue(rb) : nullptr;
     const float* vc = ttisvector(rc) ? vvalue(rc) : nullptr;
 
-    if (vb && vc)
+    // quaternion operations that we support:
+    // q*q q*v (mul)
+    const short* qb = ttisquaternion(rb) ? qvalue(rb) : nullptr;
+    const short* qc = ttisquaternion(rc) ? qvalue(rc) : nullptr;
+
+    if (qb && qc)
+    {
+        switch (op)
+        {
+        case TM_MUL: {
+            float bx = luaui_maxf(qb[0] / 32767.f, -1.f);
+            float by = luaui_maxf(qb[1] / 32767.f, -1.f);
+            float bz = luaui_maxf(qb[2] / 32767.f, -1.f);
+            float bw = luaui_maxf(qb[3] / 32767.f, -1.f);
+            float cx = luaui_maxf(qc[0] / 32767.f, -1.f);
+            float cy = luaui_maxf(qc[1] / 32767.f, -1.f);
+            float cz = luaui_maxf(qc[2] / 32767.f, -1.f);
+            float cw = luaui_maxf(qc[3] / 32767.f, -1.f);
+            setqvalue(
+                ra,
+                bx * cw + bw * cx + by * cz - bz * cy,
+                by * cw + bw * cy + bz * cx - bx * cz,
+                bz * cw + bw * cz + bx * cy - by * cx,
+                bw * cw - bx * cx - by * cy - bz * cz
+            );
+            return;
+        }
+        default:
+            break;
+        }
+    }
+    else if (qb && vc)
+    {
+        switch (op)
+        {
+        case TM_MUL: {
+            float q[4] = {
+                luaui_maxf(qb[0] / 32767.f, -1.f),
+                luaui_maxf(qb[1] / 32767.f, -1.f),
+                luaui_maxf(qb[2] / 32767.f, -1.f),
+                luaui_maxf(qb[3] / 32767.f, -1.f)
+            };
+
+            float c[3] = {
+                q[1] * vc[2] - q[2] * vc[1],
+                q[2] * vc[0] - q[0] * vc[2],
+                q[0] * vc[1] - q[1] * vc[0]
+            };
+
+            setvvalue(
+                ra,
+                float(vc[0] + 2.f * (q[1] * (c[2] + q[3] * vc[2]) - q[2] * (c[1] + q[3] * vc[1]))),
+                float(vc[1] + 2.f * (q[2] * (c[0] + q[3] * vc[0]) - q[0] * (c[2] + q[3] * vc[2]))),
+                float(vc[2] + 2.f * (q[0] * (c[1] + q[3] * vc[1]) - q[1] * (c[0] + q[3] * vc[0]))),
+                0.f
+            );
+            return;
+        }
+        default:
+            break;
+        }
+    }
+    else if (vb && vc)
     {
         switch (op)
         {

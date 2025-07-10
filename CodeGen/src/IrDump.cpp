@@ -6,6 +6,7 @@
 #include "lua.h"
 #include "lobject.h"
 #include "lstate.h"
+#include "lnumutils.h"
 
 #include <stdarg.h>
 
@@ -65,6 +66,8 @@ static const char* getTagName(uint8_t tag)
         return "tnumber";
     case LUA_TVECTOR:
         return "tvector";
+    case LUA_TQUATERNION:
+        return "tquaternion";
     case LUA_TSTRING:
         return "tstring";
     case LUA_TTABLE:
@@ -490,6 +493,17 @@ static void appendVmConstant(std::string& result, Proto* proto, int index)
 #else
         append(result, "%.9g, %.9g, %.9g", v[0], v[1], v[2]);
 #endif
+    }
+    else if (constant.tt == LUA_TQUATERNION)
+    {
+        const short* q = constant.value.q;
+
+        float x = luaui_maxf(q[0] / 32767.f, -1.f);
+        float y = luaui_maxf(q[1] / 32767.f, -1.f);
+        float z = luaui_maxf(q[2] / 32767.f, -1.f);
+        float w = luaui_maxf(q[3] / 32767.f, -1.f);
+
+        append(result, "%.9g, %.9g, %.9g, %.9g", x, y, z, w);
     }
 }
 

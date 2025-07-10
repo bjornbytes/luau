@@ -126,6 +126,23 @@ static LuaNode* hashvec(const LuaTable* t, const float* v)
     return hashpow2(t, h);
 }
 
+static LuaNode* hashquat(const LuaTable* t, const short* q)
+{
+    unsigned short i[4];
+    memcpy(i, q, sizeof(i));
+
+    // scramble bits to make sure that integer coordinates have entropy in lower bits
+    i[0] ^= i[0] >> 9;
+    i[1] ^= i[1] >> 9;
+    i[2] ^= i[2] >> 9;
+    i[3] ^= i[3] >> 9;
+
+    // Optimized Spatial Hashing for Collision Detection of Deformable Objects
+    unsigned int h = (i[0] * 73856093) ^ (i[1] * 19349663) ^ (i[2] * 83492791) ^ (i[3] * 39916801);
+
+    return hashpow2(t, h);
+}
+
 /*
 ** returns the `main' position of an element in a table (that is, the index
 ** of its hash value)
@@ -138,6 +155,8 @@ static LuaNode* mainposition(const LuaTable* t, const TValue* key)
         return hashnum(t, nvalue(key));
     case LUA_TVECTOR:
         return hashvec(t, vvalue(key));
+    case LUA_TQUATERNION:
+        return hashquat(t, qvalue(key));
     case LUA_TSTRING:
         return hashstr(t, tsvalue(key));
     case LUA_TBOOLEAN:

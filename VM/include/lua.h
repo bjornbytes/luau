@@ -75,6 +75,7 @@ enum lua_Type
     LUA_TLIGHTUSERDATA,
     LUA_TNUMBER,
     LUA_TVECTOR,
+    LUA_TQUATERNION,
 
     LUA_TSTRING, // all types above this must be value types, all types below this must be GC types - see iscollectable
 
@@ -149,6 +150,7 @@ LUA_API double lua_tonumberx(lua_State* L, int idx, int* isnum);
 LUA_API int lua_tointegerx(lua_State* L, int idx, int* isnum);
 LUA_API unsigned lua_tounsignedx(lua_State* L, int idx, int* isnum);
 LUA_API const float* lua_tovector(lua_State* L, int idx);
+LUA_API const short* lua_toquaternion(lua_State* L, int idx);
 LUA_API int lua_toboolean(lua_State* L, int idx);
 LUA_API const char* lua_tolstring(lua_State* L, int idx, size_t* len);
 LUA_API const char* lua_tostringatom(lua_State* L, int idx, int* atom);
@@ -178,6 +180,7 @@ LUA_API void lua_pushvector(lua_State* L, float x, float y, float z, float w);
 #else
 LUA_API void lua_pushvector(lua_State* L, float x, float y, float z);
 #endif
+LUA_API void lua_pushquaternion(lua_State* L, float x, float y, float z, float w);
 LUA_API void lua_pushlstring(lua_State* L, const char* s, size_t l);
 LUA_API void lua_pushstring(lua_State* L, const char* s);
 LUA_API const char* lua_pushvfstring(lua_State* L, const char* fmt, va_list argp);
@@ -372,6 +375,7 @@ LUA_API void lua_unref(lua_State* L, int ref);
 #define lua_isnil(L, n) (lua_type(L, (n)) == LUA_TNIL)
 #define lua_isboolean(L, n) (lua_type(L, (n)) == LUA_TBOOLEAN)
 #define lua_isvector(L, n) (lua_type(L, (n)) == LUA_TVECTOR)
+#define lua_isquaternion(L, n) (lua_type(L, (n)) == LUA_TQUATERNION)
 #define lua_isthread(L, n) (lua_type(L, (n)) == LUA_TTHREAD)
 #define lua_isbuffer(L, n) (lua_type(L, (n)) == LUA_TBUFFER)
 #define lua_isnone(L, n) (lua_type(L, (n)) == LUA_TNONE)

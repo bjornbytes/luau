@@ -36,6 +36,9 @@ LUALIB_API unsigned luaL_optunsigned(lua_State* L, int numArg, unsigned def);
 LUALIB_API const float* luaL_checkvector(lua_State* L, int narg);
 LUALIB_API const float* luaL_optvector(lua_State* L, int narg, const float* def);
 
+LUALIB_API const short* luaL_checkquaternion(lua_State* L, int narg);
+LUALIB_API const short* luaL_optquaternion(lua_State* L, int narg, const short* def);
+
 LUALIB_API void luaL_checkstack(lua_State* L, int sz, const char* msg);
 LUALIB_API void luaL_checktype(lua_State* L, int narg, int t);
 LUALIB_API void luaL_checkany(lua_State* L, int narg);
@@ -140,8 +143,10 @@ LUALIB_API int luaopen_math(lua_State* L);
 LUALIB_API int luaopen_debug(lua_State* L);
 
 #define LUA_VECLIBNAME "vector"
-#define LUA_QUATLIBNAME "quat"
 LUALIB_API int luaopen_vector(lua_State* L);
+
+#define LUA_QUATLIBNAME "quaternion"
+LUALIB_API int luaopen_quaternion(lua_State* L);
 
 // open all builtin libraries
 LUALIB_API void luaL_openlibs(lua_State* L);
