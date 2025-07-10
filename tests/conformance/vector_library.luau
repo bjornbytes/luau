@@ -49,6 +49,7 @@ assert(select("#", vector.cross(vector.zero, vector.one)) == 1)
 
 -- 'normalize'
 assert(vector.normalize(vector.create(0.5, 0, 0)) == vector.create(1, 0, 0))
+assert(vector.normalize(vector.create(0, 0, 0)) == vector.create(0, 0, 0))
 assert(select("#", vector.normalize(vector.one)) == 1)
 
 -- 'magnitude'

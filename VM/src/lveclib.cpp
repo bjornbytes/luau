@@ -59,13 +59,29 @@ static int vector_normalize(lua_State* L)
     const float* v = luaL_checkvector(L, 1);
 
 #if LUA_VECTOR_SIZE == 4
-    float invSqrt = 1.0f / sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
+    float length2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
 
-    lua_pushvector(L, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, v[3] * invSqrt);
+    if (length2 > 0.0f)
+    {
+        float invSqrt = 1.0f / sqrtf(length2);
+        lua_pushvector(L, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, v[3] * invSqrt);
+    }
+    else
+    {
+        lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
+    }
 #else
-    float invSqrt = 1.0f / sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    float length2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
-    lua_pushvector(L, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt);
+    if (length2 > 0.0f)
+    {
+        float invSqrt = 1.0f / sqrtf(length2);
+        lua_pushvector(L, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt);
+    }
+    else
+    {
+        lua_pushvector(L, 0.0f, 0.0f, 0.0f);
+    }
 #endif
 
     return 1;

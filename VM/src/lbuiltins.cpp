@@ -1469,13 +1469,29 @@ static int luauF_vectornormalize(lua_State* L, StkId res, TValue* arg0, int nres
         const float* v = vvalue(arg0);
 
 #if LUA_VECTOR_SIZE == 4
-        float invSqrt = 1.0f / sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
+        float length2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
 
-        setvvalue(res, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, v[3] * invSqrt);
+        if (length2 > 0.0f)
+        {
+            float invSqrt = 1.0f / sqrtf(length2);
+            setvvalue(res, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, v[3] * invSqrt);
+        }
+        else
+        {
+            setvvalue(res, 0.0f, 0.0f, 0.0f, 0.0f);
+        }
 #else
-        float invSqrt = 1.0f / sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        float length2 = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
-        setvvalue(res, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, 0.0f);
+        if (length2 > 0.0f)
+        {
+            float invSqrt = 1.0f / sqrtf(length2);
+            setvvalue(res, v[0] * invSqrt, v[1] * invSqrt, v[2] * invSqrt, 0.f);
+        }
+        else
+        {
+            setvvalue(res, 0.0f, 0.0f, 0.0f, 0.f);
+        }
 #endif
 
         return 1;
