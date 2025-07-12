@@ -395,16 +395,45 @@ int luaopen_vector(lua_State* L)
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 
+    // constants
 #if LUA_VECTOR_SIZE == 4
     lua_pushvector(L, 0.0f, 0.0f, 0.0f, 0.0f);
     lua_setfield(L, -2, "zero");
     lua_pushvector(L, 1.0f, 1.0f, 1.0f, 1.0f);
     lua_setfield(L, -2, "one");
+    lua_pushvector(L, -1.0f, 0.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "left");
+    lua_pushvector(L, 1.0f, 0.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "right");
+    lua_pushvector(L, 0.0f, 1.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "up");
+    lua_pushvector(L, 0.0f, -1.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "down");
+    lua_pushvector(L, 0.0f, 0.0f, -1.0f, 0.0f);
+    lua_setfield(L, -2, "forward");
+    lua_pushvector(L, 0.0f, 0.0f, 1.0f, 0.0f);
+    lua_setfield(L, -2, "back");
+    lua_pushvector(L, 0.0f, 0.0f, 1.0f, 0.0f);
+    lua_setfield(L, -2, "backward");
 #else
     lua_pushvector(L, 0.0f, 0.0f, 0.0f);
     lua_setfield(L, -2, "zero");
     lua_pushvector(L, 1.0f, 1.0f, 1.0f);
     lua_setfield(L, -2, "one");
+    lua_pushvector(L, -1.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "left");
+    lua_pushvector(L, 1.0f, 0.0f, 0.0f);
+    lua_setfield(L, -2, "right");
+    lua_pushvector(L, 0.0f, 1.0f, 0.0f);
+    lua_setfield(L, -2, "up");
+    lua_pushvector(L, 0.0f, -1.0f, 0.0f);
+    lua_setfield(L, -2, "down");
+    lua_pushvector(L, 0.0f, 0.0f, -1.0f);
+    lua_setfield(L, -2, "forward");
+    lua_pushvector(L, 0.0f, 0.0f, 1.0f);
+    lua_setfield(L, -2, "back");
+    lua_pushvector(L, 0.0f, 0.0f, 1.0f);
+    lua_setfield(L, -2, "backward");
 #endif
 
     // metatable

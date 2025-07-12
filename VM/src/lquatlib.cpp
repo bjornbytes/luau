@@ -166,7 +166,9 @@ static int quaternion_between(lua_State* L)
     float z = a[0] * b[1] - a[1] * b[0];
     float w = 1.f + dot;
 
-    lua_pushquaternion(L, x, y, z, w);
+    float length = sqrtf(x * x + y * y + z * z + w * w);
+
+    lua_pushquaternion(L, x / length, y / length, z / length, w / length);
 
     return 1;
 }
@@ -351,6 +353,10 @@ int luaopen_quaternion(lua_State* L)
     lua_pushcfunction(L, quaternion_call, nullptr);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
+
+    // constants
+    lua_pushquaternion(L, 0.0f, 0.0f, 0.0f, 1.0f);
+    lua_setfield(L, -2, "identity");
 
     // metatable
     lua_pushquaternion(L, 0.0f, 0.0f, 0.0f, 1.0f);
