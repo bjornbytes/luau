@@ -175,8 +175,9 @@ static int quaternion_between(lua_State* L)
 
 static int quaternion_lookdir(lua_State* L)
 {
+    const float yup[3] = { 0.f, 1.f, 0.f };
     const float* dir = luaL_checkvector(L, 1);
-    const float* up = luaL_optvector(L, 2, (float[3]) { 0.f, 1.f, 0.f });
+    const float* up = luaL_optvector(L, 2, yup);
 
     float Z[3] = { dir[0], dir[1], dir[2] };
     float length = sqrtf(Z[0] * Z[0] + Z[1] * Z[1] + Z[2] * Z[2]);
