@@ -189,6 +189,32 @@ static int luaB_rawlen(lua_State* L)
     return 1;
 }
 
+static int luaB_collectgarbage(lua_State* L)
+{
+    static const char* const opts[] = {"stop", "restart", "collect", "count", "isrunning", "step", "setgoal", "setstepmul", "setstepsize", nullptr};
+    static const int optsnum[] = {
+        LUA_GCSTOP, LUA_GCRESTART, LUA_GCCOLLECT, LUA_GCCOUNT, LUA_GCISRUNNING, LUA_GCSTEP, LUA_GCSETGOAL, LUA_GCSETSTEPMUL, LUA_GCSETSTEPSIZE
+    };
+
+    int o = luaL_checkoption(L, 1, "collect", opts);
+    int ex = luaL_optinteger(L, 2, 0);
+    int res = lua_gc(L, optsnum[o], ex);
+    switch (optsnum[o])
+    {
+    case LUA_GCSTEP:
+    case LUA_GCISRUNNING:
+    {
+        lua_pushboolean(L, res);
+        return 1;
+    }
+    default:
+    {
+        lua_pushnumber(L, res);
+        return 1;
+    }
+    }
+}
+
 static int luaB_gcinfo(lua_State* L)
 {
     lua_pushinteger(L, lua_gc(L, LUA_GCCOUNT, 0));
@@ -446,6 +472,7 @@ static int luaB_newproxy(lua_State* L)
 static const luaL_Reg base_funcs[] = {
     {"assert", luaB_assert},
     {"error", luaB_error},
+    {"collectgarbage", luaB_collectgarbage},
     {"gcinfo", luaB_gcinfo},
     {"getfenv", luaB_getfenv},
     {"getmetatable", luaB_getmetatable},
