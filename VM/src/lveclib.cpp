@@ -8,19 +8,15 @@
 
 static int vector_pack(lua_State* L)
 {
-    int count = lua_gettop(L);
-    count = count < 4 ? count : 4;
-
-    float v[4] = { 0.f, 0.f, 0.f, 1.f };
-
-    for (int i = 0; i < count; i++) {
-      v[i] = float(luaL_checknumber(L, i + 1));
-    }
+    float x = float(luaL_optnumber(L, 1, 0.f));
+    float y = float(luaL_optnumber(L, 2, x));
+    float z = float(luaL_optnumber(L, 3, x));
 
 #if LUA_VECTOR_SIZE == 4
-    lua_pushvector(L, float(v[0]), float(v[1]), float(v[2]), float(v[3]));
+    float w = float(luaL_optnumber(L, 4, x));
+    lua_pushvector(L, x, y, z, w);
 #else
-    lua_pushvector(L, float(v[0]), float(v[1]), float(v[2]));
+    lua_pushvector(L, x, y, z);
 #endif
 
     return 1;
