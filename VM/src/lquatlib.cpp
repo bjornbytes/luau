@@ -218,27 +218,44 @@ static int quaternion_lookdir(lua_State* L)
     float m10 = X[1], m11 = Y[1], m12 = Z[1];
     float m20 = X[2], m21 = Y[2], m22 = Z[2];
 
+    float x, y, z, w;
+
     if (m22 < 0.f) {
       if (m00 > m11) {
         float t = 1.f + m00 - m11 - m22;
         float s = .5f / sqrtf(t);
-        lua_pushquaternion(L, t * s, (m01 + m10) * s, (m20 + m02) * s, (m12 - m21) * s);
+        x = t * s;
+        y = (m01 + m10) * s;
+        z = (m20 + m02) * s;
+        w = (m12 - m21) * s;
       } else {
         float t = 1.f - m00 + m11 - m22;
         float s = .5f / sqrtf(t);
-        lua_pushquaternion(L, (m01 + m10) * s, t * s, (m12 + m21) * s, (m20 - m02) * s);
+        x = (m01 + m10) * s;
+        y = t * s;
+        z = (m12 + m21) * s;
+        w = (m20 - m02) * s;
       }
     } else {
       if (m00 < -m11) {
         float t = 1.f - m00 - m11 + m22;
         float s = .5f / sqrtf(t);
-        lua_pushquaternion(L, (m20 + m02) * s, (m12 + m21) * s, t * s, (m01 - m10) * s);
+        x = (m20 + m02) * s;
+        y = (m12 + m21) * s;
+        z = t * s;
+        w = (m01 - m10) * s;
       } else {
         float t = 1.f + m00 + m11 + m22;
         float s = .5f / sqrtf(t);
-        lua_pushquaternion(L, (m12 - m21) * s, (m20 - m02) * s, (m01 - m10) * s, t * s);
+        x = (m12 - m21) * s;
+        y = (m20 - m02) * s;
+        z = (m01 - m10) * s;
+        w = t * s;
       }
     }
+
+    length = sqrtf(x * x + y * y + z * z + w * w);
+    lua_pushquaternion(L, x / length, y / length, z / length, w / length);
 
     return 1;
 }
