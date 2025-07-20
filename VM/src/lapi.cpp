@@ -1224,7 +1224,7 @@ int lua_gc(lua_State* L, int what, int data)
 ** miscellaneous functions
 */
 
-l_noret lua_error(lua_State* L)
+l_noret lua_errorL(lua_State* L)
 {
     api_checknelems(L, 1);
 

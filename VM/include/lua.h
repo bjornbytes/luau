@@ -309,7 +309,7 @@ LUA_API size_t lua_totalbytes(lua_State* L, int category);
 ** miscellaneous functions
 */
 
-LUA_API l_noret lua_error(lua_State* L);
+LUA_API l_noret lua_errorL(lua_State* L);
 
 LUA_API int lua_next(lua_State* L, int idx);
 LUA_API int lua_rawiter(lua_State* L, int idx, int iter);
@@ -392,6 +392,7 @@ LUA_API void lua_unref(lua_State* L, int ref);
 #define lua_tostring(L, i) lua_tolstring(L, (i), NULL)
 
 #define lua_pushfstring(L, fmt, ...) lua_pushfstringL(L, fmt, ##__VA_ARGS__)
+#define lua_error(L) (lua_errorL(L), 0)
 
 /*
 ** {======================================================================

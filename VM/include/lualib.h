@@ -4,9 +4,9 @@
 
 #include "lua.h"
 
-#define luaL_error(L, fmt, ...) luaL_errorL(L, fmt, ##__VA_ARGS__)
-#define luaL_typeerror(L, narg, tname) luaL_typeerrorL(L, narg, tname)
-#define luaL_argerror(L, narg, extramsg) luaL_argerrorL(L, narg, extramsg)
+#define luaL_error(L, fmt, ...) (luaL_errorL(L, fmt, ##__VA_ARGS__), 0)
+#define luaL_typeerror(L, narg, tname) (luaL_typeerrorL(L, narg, tname), 0)
+#define luaL_argerror(L, narg, extramsg) (luaL_argerrorL(L, narg, extramsg), 0)
 
 struct luaL_Reg
 {
@@ -70,8 +70,8 @@ LUALIB_API int luaL_callyieldable(lua_State* L, int nargs, int nresults);
 ** ===============================================================
 */
 
-#define luaL_argcheck(L, cond, arg, extramsg) ((void)((cond) ? (void)0 : luaL_argerror(L, arg, extramsg)))
-#define luaL_argexpected(L, cond, arg, tname) ((void)((cond) ? (void)0 : luaL_typeerror(L, arg, tname)))
+#define luaL_argcheck(L, cond, arg, extramsg) ((int)((cond) ? (int)0 : luaL_argerror(L, arg, extramsg)))
+#define luaL_argexpected(L, cond, arg, tname) ((int)((cond) ? (int)0 : luaL_typeerror(L, arg, tname)))
 
 #define luaL_checkstring(L, n) (luaL_checklstring(L, (n), NULL))
 #define luaL_optstring(L, n, d) (luaL_optlstring(L, (n), (d), NULL))
