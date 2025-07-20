@@ -80,6 +80,9 @@ LUALIB_API int luaL_callyieldable(lua_State* L, int nargs, int nresults);
 
 #define luaL_opt(L, f, n, d) (lua_isnoneornil(L, (n)) ? (d) : f(L, (n)))
 
+#define luaL_checkint luaL_checkinteger
+#define luaL_optint luaL_optinteger
+
 // generic buffer manipulation
 
 struct luaL_Strbuf
