@@ -83,6 +83,9 @@ LUALIB_API int luaL_callyieldable(lua_State* L, int nargs, int nresults);
 #define luaL_checkint luaL_checkinteger
 #define luaL_optint luaL_optinteger
 
+#define luaL_ref(L, idx) lua_ref(L, -1), lua_pop(L, 1)
+#define luaL_unref(L, idx, ref) lua_unref(L, ref)
+
 // generic buffer manipulation
 
 struct luaL_Strbuf
