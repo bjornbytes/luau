@@ -7,3 +7,5 @@
 
 #define luaL_ref(L, idx) lua_ref(L, -1), lua_pop(L, 1)
 #define luaL_unref(L, idx, ref) lua_unref(L, ref)
+
+#define luaL_getsubtable(L, idx, fname) luaL_findtable(L, idx, fname, 1)
