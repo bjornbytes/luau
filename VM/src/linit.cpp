@@ -17,6 +17,7 @@ static const luaL_Reg lualibs[] = {
     {LUA_BUFFERLIBNAME, luaopen_buffer},
     {LUA_VECLIBNAME, luaopen_vector},
     {LUA_QUATLIBNAME, luaopen_quaternion},
+    {LUA_PKGLIBNAME, luaopen_package},
     {NULL, NULL},
 };
 

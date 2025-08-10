@@ -148,6 +148,9 @@ LUALIB_API int luaopen_vector(lua_State* L);
 #define LUA_QUATLIBNAME "quaternion"
 LUALIB_API int luaopen_quaternion(lua_State* L);
 
+#define LUA_PKGLIBNAME "package"
+LUALIB_API int luaopen_package(lua_State* L);
+
 // open all builtin libraries
 LUALIB_API void luaL_openlibs(lua_State* L);
 

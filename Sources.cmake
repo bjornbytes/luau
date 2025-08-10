@@ -357,6 +357,7 @@ target_sources(Luau.VM PRIVATE
     VM/src/lnumprint.cpp
     VM/src/lobject.cpp
     VM/src/loslib.cpp
+    VM/src/lpkglib.cpp
     VM/src/lperf.cpp
     VM/src/lquatlib.cpp
     VM/src/lstate.cpp
