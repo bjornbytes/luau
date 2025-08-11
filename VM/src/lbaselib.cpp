@@ -495,8 +495,8 @@ static const luaL_Reg base_funcs[] = {
 
 static void auxopen(lua_State* L, const char* name, lua_CFunction f, lua_CFunction u)
 {
-    lua_pushcfunction(L, u, NULL);
-    lua_pushcclosure(L, f, name, 1);
+    lua_pushcfunction(L, u);
+    luaL_pushcclosure(L, f, name, 1);
     lua_setfield(L, -2, name);
 }
 

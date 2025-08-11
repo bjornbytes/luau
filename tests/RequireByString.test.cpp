@@ -518,7 +518,7 @@ TEST_CASE_FIXTURE(ReplWithPathFixture, "CheckClearCacheEntry")
     lua_getfield(L, -1, cacheKey.c_str());
     REQUIRE_FALSE_MESSAGE(lua_isnil(L, -1), "Cache did not contain module result");
 
-    lua_pushcfunction(L, luarequire_clearcacheentry, nullptr);
+    lua_pushcfunction(L, luarequire_clearcacheentry);
     lua_pushstring(L, cacheKey.c_str());
     lua_call(L, 1, 0);
 
@@ -546,7 +546,7 @@ TEST_CASE_FIXTURE(ReplWithPathFixture, "CheckClearCache")
     lua_getfield(L, -1, cacheKey.c_str());
     REQUIRE_FALSE_MESSAGE(lua_isnil(L, -1), "Cache did not contain module result");
 
-    lua_pushcfunction(L, luarequire_clearcache, nullptr);
+    lua_pushcfunction(L, luarequire_clearcache);
     lua_call(L, 0, 0);
 
     luaL_findtable(L, LUA_REGISTRYINDEX, "_MODULES", 1);
@@ -556,7 +556,7 @@ TEST_CASE_FIXTURE(ReplWithPathFixture, "CheckClearCache")
 
 TEST_CASE_FIXTURE(ReplWithPathFixture, "RegisterRuntimeModule")
 {
-    lua_pushcfunction(L, luarequire_registermodule, nullptr);
+    lua_pushcfunction(L, luarequire_registermodule);
     lua_pushstring(L, "@test/helloworld");
     lua_newtable(L);
     lua_pushstring(L, "hello");

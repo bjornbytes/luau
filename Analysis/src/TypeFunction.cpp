@@ -1182,7 +1182,7 @@ TypeFunctionReductionResult<TypeId> userDefinedTypeFunction(
                     else
                     {
                         lua_pushlightuserdata(L, definition.first);
-                        lua_pushcclosure(L, evaluateTypeAliasCall, name.c_str(), 1);
+                        luaL_pushcclosure(L, evaluateTypeAliasCall, name.c_str(), 1);
                         lua_setfield(L, -2, name.c_str());
                     }
                 }

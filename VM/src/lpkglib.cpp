@@ -66,7 +66,7 @@ int luaopen_package(lua_State* L)
     int count = (int) (sizeof(loaders) / sizeof(loaders[0]));
     lua_createtable(L, count, 0);
     for (int i = 0; i < count; i++) {
-        lua_pushcfunction(L, loaders[i], NULL);
+        lua_pushcfunction(L, loaders[i]);
         lua_rawseti(L, -2, i + 1);
     }
     lua_pushvalue(L, -1);
@@ -83,7 +83,7 @@ int luaopen_package(lua_State* L)
 
     // require
     lua_pushvalue(L, LUA_GLOBALSINDEX);
-    lua_pushcfunction(L, pkg_require, "require");
+    luaL_pushcfunction(L, pkg_require, "require");
     lua_setfield(L, -2, "require");
     lua_pop(L, 1);
 

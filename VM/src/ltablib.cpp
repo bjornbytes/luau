@@ -620,7 +620,7 @@ int luaopen_table(lua_State* L)
     luaL_register(L, LUA_TABLIBNAME, tab_funcs);
 
     // Lua 5.1 compat
-    lua_pushcfunction(L, tunpack, "unpack");
+    luaL_pushcfunction(L, tunpack, "unpack");
     lua_setglobal(L, "unpack");
 
     return 1;

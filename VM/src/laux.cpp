@@ -325,7 +325,7 @@ void luaL_register(lua_State* L, const char* libname, const luaL_Reg* l)
     }
     for (; l->name; l++)
     {
-        lua_pushcfunction(L, l->func, l->name);
+        luaL_pushcfunction(L, l->func, l->name);
         lua_setfield(L, -2, l->name);
     }
 }

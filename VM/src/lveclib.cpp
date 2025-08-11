@@ -387,7 +387,7 @@ int luaopen_vector(lua_State* L)
 
     // __call
     lua_newtable(L);
-    lua_pushcfunction(L, vector_call, nullptr);
+    lua_pushcfunction(L, vector_call);
     lua_setfield(L, -2, "__call");
     lua_setmetatable(L, -2);
 

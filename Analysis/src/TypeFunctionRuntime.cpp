@@ -1629,14 +1629,14 @@ void registerTypeUserData(lua_State* L)
     lua_pushstring(L, "The metatable is locked");
     lua_setfield(L, -2, "__metatable");
 
-    lua_pushcfunction(L, isEqualToType, "__eq");
+    luaL_pushcfunction(L, isEqualToType, "__eq");
     lua_setfield(L, -2, "__eq");
 
     // Indexing will be a dynamic function because some type fields are dynamic
     lua_newtable(L);
     luaL_register(L, nullptr, typeUserdataMethods);
     lua_setreadonly(L, -1, true);
-    lua_pushcclosure(L, typeUserdataIndex, "__index", 1);
+    luaL_pushcclosure(L, typeUserdataIndex, "__index", 1);
     lua_setfield(L, -2, "__index");
 
     lua_setreadonly(L, -1, true);
@@ -1712,11 +1712,11 @@ void setTypeFunctionEnvironment(lua_State* L)
     static const char* unavailableGlobals[] = {"gcinfo", "getfenv", "newproxy", "setfenv", "pcall", "xpcall"};
     for (auto& name : unavailableGlobals)
     {
-        lua_pushcfunction(L, unsupportedFunction, name);
+        luaL_pushcfunction(L, unsupportedFunction, name);
         lua_setglobal(L, name);
     }
 
-    lua_pushcfunction(L, print, "print");
+    luaL_pushcfunction(L, print, "print");
     lua_setglobal(L, "print");
 }
 

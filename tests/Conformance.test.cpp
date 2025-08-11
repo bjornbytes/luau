@@ -177,7 +177,7 @@ static int lua_vector_index(lua_State* L)
 
     if (strcmp(name, "Dot") == 0)
     {
-        lua_pushcfunction(L, lua_vector_dot, "Dot");
+        luaL_pushcfunction(L, lua_vector_dot, "Dot");
         return 1;
     }
 
@@ -347,7 +347,7 @@ static void* limitedRealloc(void* ud, void* ptr, size_t osize, size_t nsize)
 
 void setupVectorHelpers(lua_State* L)
 {
-    lua_pushcfunction(L, lua_vector, "vector");
+    luaL_pushcfunction(L, lua_vector, "vector");
     lua_setglobal(L, "vector");
 
 #if LUA_VECTOR_SIZE == 4
@@ -358,11 +358,11 @@ void setupVectorHelpers(lua_State* L)
     luaL_newmetatable(L, "vector");
 
     lua_pushstring(L, "__index");
-    lua_pushcfunction(L, lua_vector_index, nullptr);
+    lua_pushcfunction(L, lua_vector_index);
     lua_settable(L, -3);
 
     lua_pushstring(L, "__namecall");
-    lua_pushcfunction(L, lua_vector_namecall, nullptr);
+    lua_pushcfunction(L, lua_vector_namecall);
     lua_settable(L, -3);
 
     lua_setreadonly(L, -1, true);
@@ -483,10 +483,10 @@ void setupUserdataHelpers(lua_State* L)
     lua_pushvalue(L, -1);
     lua_setuserdatametatable(L, kTagVec2);
 
-    lua_pushcfunction(L, lua_vec2_index, nullptr);
+    lua_pushcfunction(L, lua_vec2_index);
     lua_setfield(L, -2, "__index");
 
-    lua_pushcfunction(L, lua_vec2_namecall, nullptr);
+    lua_pushcfunction(L, lua_vec2_namecall);
     lua_setfield(L, -2, "__namecall");
 
     lua_pushcclosurek(
@@ -586,7 +586,7 @@ void setupUserdataHelpers(lua_State* L)
     lua_setreadonly(L, -1, true);
 
     // ctor
-    lua_pushcfunction(L, lua_vec2, "vec2");
+    luaL_pushcfunction(L, lua_vec2, "vec2");
     lua_setglobal(L, "vec2");
 
     lua_pop(L, 1);
@@ -666,7 +666,7 @@ TEST_CASE("Tables")
         "tables.luau",
         [](lua_State* L)
         {
-            lua_pushcfunction(
+            luaL_pushcfunction(
                 L,
                 [](lua_State* L)
                 {
@@ -839,10 +839,10 @@ TEST_CASE("PCall")
         "pcall.luau",
         [](lua_State* L)
         {
-            lua_pushcfunction(L, cxxthrow, "cxxthrow");
+            luaL_pushcfunction(L, cxxthrow, "cxxthrow");
             lua_setglobal(L, "cxxthrow");
 
-            lua_pushcfunction(
+            luaL_pushcfunction(
                 L,
                 [](lua_State* L) -> int
                 {
@@ -1697,8 +1697,7 @@ TEST_CASE("NewUserdataOverflow")
             // The overflow might segfault in the following call.
             lua_getmetatable(L1, -1);
             return 0;
-        },
-        nullptr
+        }
     );
 
     CHECK(lua_pcall(L, 0, 0, 0) == LUA_ERRRUN);
@@ -2104,7 +2103,7 @@ TEST_CASE("ApiStack")
     StateRef globalState(luaL_newstate(), lua_close);
     lua_State* L = globalState.get();
 
-    lua_pushcfunction(L, slowlyOverflowStack, "foo");
+    luaL_pushcfunction(L, slowlyOverflowStack, "foo");
     int result = lua_pcall(L, 0, 0, 0);
     REQUIRE(result == LUA_ERRRUN);
     CHECK(strcmp(luaL_checkstring(L, -1), "stack overflow (test)") == 0);
@@ -2266,7 +2265,7 @@ TEST_CASE("Coverage")
         "coverage.luau",
         [](lua_State* L)
         {
-            lua_pushcfunction(
+            luaL_pushcfunction(
                 L,
                 [](lua_State* L) -> int
                 {
@@ -2358,7 +2357,7 @@ TEST_CASE("GCDump")
     lua_setmetatable(L, -2);
 
     lua_pushinteger(L, 1);
-    lua_pushcclosure(L, lua_silence, "test", 1);
+    luaL_pushcclosure(L, lua_silence, "test", 1);
 
     lua_newbuffer(L, 100);
 
@@ -2849,8 +2848,7 @@ TEST_CASE("Userdata")
                     }
 
                     luaL_error(L, "unknown field %s", name);
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__index");
 
@@ -2873,8 +2871,7 @@ TEST_CASE("Userdata")
                     }
 
                     luaL_error(L, "unknown field %s", name);
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__newindex");
 
@@ -2885,8 +2882,7 @@ TEST_CASE("Userdata")
                 {
                     lua_pushboolean(L, getInt64(L, 1) == getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__eq");
 
@@ -2897,8 +2893,7 @@ TEST_CASE("Userdata")
                 {
                     lua_pushboolean(L, getInt64(L, 1) < getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__lt");
 
@@ -2909,8 +2904,7 @@ TEST_CASE("Userdata")
                 {
                     lua_pushboolean(L, getInt64(L, 1) <= getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__le");
 
@@ -2921,8 +2915,7 @@ TEST_CASE("Userdata")
                 {
                     pushInt64(L, getInt64(L, 1) + getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__add");
 
@@ -2933,8 +2926,7 @@ TEST_CASE("Userdata")
                 {
                     pushInt64(L, getInt64(L, 1) - getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__sub");
 
@@ -2945,8 +2937,7 @@ TEST_CASE("Userdata")
                 {
                     pushInt64(L, getInt64(L, 1) * getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__mul");
 
@@ -2958,8 +2949,7 @@ TEST_CASE("Userdata")
                     // ideally we'd guard against 0 but it's a test so eh
                     pushInt64(L, getInt64(L, 1) / getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__div");
 
@@ -2973,8 +2963,7 @@ TEST_CASE("Userdata")
                     // we do not necessarily recommend this behavior in production code!
                     pushInt64(L, int64_t(floor(double(getInt64(L, 1)) / double(getInt64(L, 2)))));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__idiv");
 
@@ -2986,8 +2975,7 @@ TEST_CASE("Userdata")
                     // ideally we'd guard against 0 and INT64_MIN but it's a test so eh
                     pushInt64(L, getInt64(L, 1) % getInt64(L, 2));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__mod");
 
@@ -2998,8 +2986,7 @@ TEST_CASE("Userdata")
                 {
                     pushInt64(L, int64_t(pow(double(getInt64(L, 1)), double(getInt64(L, 2)))));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__pow");
 
@@ -3010,8 +2997,7 @@ TEST_CASE("Userdata")
                 {
                     pushInt64(L, -getInt64(L, 1));
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__unm");
 
@@ -3024,13 +3010,12 @@ TEST_CASE("Userdata")
                     std::string str = std::to_string(value);
                     lua_pushlstring(L, str.c_str(), str.length());
                     return 1;
-                },
-                nullptr
+                }
             );
             lua_setfield(L, -2, "__tostring");
 
             // ctor
-            lua_pushcfunction(
+            luaL_pushcfunction(
                 L,
                 [](lua_State* L)
                 {
