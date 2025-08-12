@@ -133,11 +133,11 @@ static int quaternion_toeuler(lua_State* L)
   float ax, ay, az;
 
   if (test > (.5f - eps) * unit) {
-    ax = (float) M_PI / 2.f;
+    ax = (float) PI / 2.f;
     ay = 2.f * atan2f(y, x);
     az = 0.f;
   } else if (test < -(.5f - eps) * unit) {
-    ax = (float) -M_PI / 2.f;
+    ax = (float) -PI / 2.f;
     ay = -2.f * atan2f(y, x);
     az = 0.f;
   } else {
