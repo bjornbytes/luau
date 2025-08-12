@@ -6,6 +6,9 @@
 
 #include <math.h>
 
+#undef PI
+#define PI (3.14159265358979323846)
+
 static int quaternion_pack(lua_State* L)
 {
     if (lua_isnoneornil(L, 1))
@@ -14,10 +17,10 @@ static int quaternion_pack(lua_State* L)
         return 1;
     }
 
-    float x = luaL_checknumber(L, 1);
-    float y = luaL_checknumber(L, 2);
-    float z = luaL_checknumber(L, 3);
-    float w = luaL_checknumber(L, 4);
+    float x = float(luaL_checknumber(L, 1));
+    float y = float(luaL_checknumber(L, 2));
+    float z = float(luaL_checknumber(L, 3));
+    float w = float(luaL_checknumber(L, 4));
 
     float length2 = x * x + y * y + z * z + w * w;
 
@@ -61,10 +64,10 @@ static int quaternion_conjugate(lua_State* L)
 
 static int quaternion_angleaxis(lua_State* L)
 {
-    float angle = luaL_checknumber(L, 1);
-    float ax = luaL_checknumber(L, 2);
-    float ay = luaL_checknumber(L, 3);
-    float az = luaL_checknumber(L, 4);
+    float angle = float(luaL_checknumber(L, 1));
+    float ax = float(luaL_checknumber(L, 2));
+    float ay = float(luaL_checknumber(L, 3));
+    float az = float(luaL_checknumber(L, 4));
 
     float s = sinf(angle * .5f);
     float c = cosf(angle * .5f);
@@ -93,9 +96,9 @@ static int quaternion_toangleaxis(lua_State* L)
 
 static int quaternion_euler(lua_State* L)
 {
-  float x = luaL_checknumber(L, 1);
-  float y = luaL_checknumber(L, 2);
-  float z = luaL_checknumber(L, 3);
+  float x = float(luaL_checknumber(L, 1));
+  float y = float(luaL_checknumber(L, 2));
+  float z = float(luaL_checknumber(L, 3));
 
   float cx = cosf(x * .5f);
   float sx = sinf(x * .5f);
@@ -282,7 +285,7 @@ static int quaternion_slerp(lua_State* L)
 {
     const short* q = luaL_checkquaternion(L, 1);
     const short* r = luaL_checkquaternion(L, 2);
-    float t = luaL_checknumber(L, 3);
+    float t = float(luaL_checknumber(L, 3));
 
     float qx = luaui_maxf(q[0] / 32767.f, -1.f);
     float qy = luaui_maxf(q[1] / 32767.f, -1.f);

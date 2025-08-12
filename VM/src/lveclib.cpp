@@ -306,7 +306,7 @@ static int vector_lerp(lua_State* L)
 {
     const float* a = luaL_checkvector(L, 1);
     const float* b = luaL_checkvector(L, 2);
-    float t = luaL_checknumber(L, 3);
+    float t = float(luaL_checknumber(L, 3));
 
     float x = a[0] + (b[0] - a[0]) * t;
     float y = a[1] + (b[1] - a[1]) * t;
