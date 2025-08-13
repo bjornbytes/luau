@@ -182,7 +182,7 @@ static int quaternion_lookdir(lua_State* L)
     const float* dir = luaL_checkvector(L, 1);
     const float* up = luaL_optvector(L, 2, yup);
 
-    float Z[3] = { dir[0], dir[1], dir[2] };
+    float Z[3] = { -dir[0], -dir[1], -dir[2] };
     float length = sqrtf(Z[0] * Z[0] + Z[1] * Z[1] + Z[2] * Z[2]);
 
     if (length == 0.f) {
@@ -194,7 +194,7 @@ static int quaternion_lookdir(lua_State* L)
     Z[1] /= length;
     Z[2] /= length;
 
-    float X[3] = { Z[1] * up[2] - Z[2] * up[1], Z[2] * up[0] - Z[0] * up[2], Z[0] * up[1] - Z[1] * up[0] };
+    float X[3] = { up[1] * Z[2] - up[2] * Z[1], up[2] * Z[0] - up[0] * Z[2], up[0] * Z[1] - up[1] * Z[0] };
     length = sqrtf(X[0] * X[0] + X[1] * X[1] + X[2] * X[2]);
 
     if (length == 0.f) {
@@ -215,11 +215,11 @@ static int quaternion_lookdir(lua_State* L)
     X[1] /= length;
     X[2] /= length;
 
-    float Y[3] = { X[1] * Z[2] - X[2] * Z[1], X[2] * Z[0] - X[0] * Z[2], X[0] * Z[1] - X[1] * Z[0] };
+    float Y[3] = { Z[1] * X[2] - Z[2] * X[1], Z[2] * X[0] - Z[0] * X[2], Z[0] * X[1] - Z[1] * X[0] };
 
-    float m00 = X[0], m01 = Y[0], m02 = Z[0];
-    float m10 = X[1], m11 = Y[1], m12 = Z[1];
-    float m20 = X[2], m21 = Y[2], m22 = Z[2];
+    float m00 = X[0], m01 = X[1], m02 = X[2];
+    float m10 = Y[0], m11 = Y[1], m12 = Y[2];
+    float m20 = Z[0], m21 = Z[1], m22 = Z[2];
 
     float x, y, z, w;
 
