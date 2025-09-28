@@ -8,8 +8,6 @@
 #include "Luau/TypeUtils.h"
 #include "Luau/VisitType.h"
 
-LUAU_FASTFLAGVARIABLE(LuauImplicitTableIndexerKeys2)
-
 namespace Luau
 {
 
@@ -81,7 +79,9 @@ struct IndexerIndexCollector : public TypeOnceVisitor
 {
     NotNull<TypeIds> indexes;
 
-    explicit IndexerIndexCollector(NotNull<TypeIds> indexes) : TypeOnceVisitor(/* skipBoundTypes */ true), indexes(indexes)
+    explicit IndexerIndexCollector(NotNull<TypeIds> indexes)
+        : TypeOnceVisitor("IndexerIndexCollector", /* skipBoundTypes */ true)
+        , indexes(indexes)
     {
     }
 
@@ -100,7 +100,6 @@ struct IndexerIndexCollector : public TypeOnceVisitor
     {
         return true;
     }
-
 };
 
 struct IndexCollector : public TypeOnceVisitor
@@ -108,7 +107,9 @@ struct IndexCollector : public TypeOnceVisitor
     NotNull<TypeArena> arena;
     TypeIds indexes;
 
-    explicit IndexCollector(NotNull<TypeArena> arena) : TypeOnceVisitor(/* skipBoundTypes */ true), arena(arena)
+    explicit IndexCollector(NotNull<TypeArena> arena)
+        : TypeOnceVisitor("IndexCollector", /* skipBoundTypes */ true)
+        , arena(arena)
     {
     }
 
@@ -140,33 +141,23 @@ struct IndexCollector : public TypeOnceVisitor
 
         return false;
     }
-
 };
 
-}
+} // namespace
 
 bool ExpectedTypeVisitor::visit(AstExprIndexExpr* expr)
 {
-    if (!FFlag::LuauImplicitTableIndexerKeys2)
-        return true;
-
     if (auto ty = astTypes->find(expr->expr))
     {
         IndexCollector ic{arena};
         ic.traverse(*ty);
         if (ic.indexes.size() > 1)
         {
-            applyExpectedType(
-                arena->addType(UnionType{ic.indexes.take()}),
-                expr->index
-            );
+            applyExpectedType(arena->addType(UnionType{ic.indexes.take()}), expr->index);
         }
         else if (ic.indexes.size() == 1)
         {
-            applyExpectedType(
-                *ic.indexes.begin(),
-                expr->index
-            );
+            applyExpectedType(*ic.indexes.begin(), expr->index);
         }
     }
 

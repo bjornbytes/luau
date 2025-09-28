@@ -229,7 +229,11 @@ if(LUAU_BUILD_CLI)
     target_link_libraries(Luau.Repl.CLI PRIVATE Luau.Compiler Luau.Config Luau.CodeGen Luau.VM Luau.Require Luau.CLI.lib isocline)
 
     target_link_libraries(Luau.Repl.CLI PRIVATE osthreads)
+    target_link_libraries(Luau.Reduce.CLI PRIVATE osthreads)
     target_link_libraries(Luau.Analyze.CLI PRIVATE osthreads)
+    target_link_libraries(Luau.Ast.CLI PRIVATE osthreads)
+    target_link_libraries(Luau.Compile.CLI PRIVATE osthreads)
+    target_link_libraries(Luau.Bytecode.CLI PRIVATE osthreads)
 
     target_link_libraries(Luau.Analyze.CLI PRIVATE Luau.Analysis Luau.CLI.lib Luau.RequireNavigator)
 
@@ -266,6 +270,7 @@ if(LUAU_BUILD_TESTS)
     target_link_libraries(Luau.CLI.Test PRIVATE Luau.Compiler Luau.Config Luau.CodeGen Luau.VM Luau.Require Luau.CLI.lib isocline)
     target_link_libraries(Luau.CLI.Test PRIVATE osthreads)
 
+    add_subdirectory(fuzz)
 endif()
 
 if(LUAU_BUILD_WEB)
@@ -281,8 +286,6 @@ if(LUAU_BUILD_WEB)
     # the output is a single .js file with an embedded wasm blob
     target_link_options(Luau.Web PRIVATE -sSINGLE_FILE=1)
 endif()
-
-add_subdirectory(fuzz)
 
 # validate dependencies for internal libraries
 foreach(LIB Luau.Ast Luau.Compiler Luau.Config Luau.Analysis Luau.EqSat Luau.CodeGen Luau.VM)

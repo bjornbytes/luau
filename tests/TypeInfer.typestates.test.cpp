@@ -4,12 +4,8 @@
 #include "doctest.h"
 
 LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauDoNotAddUpvalueTypesToLocalType)
-LUAU_FASTFLAG(LuauDfgIfBlocksShouldRespectControlFlow)
-LUAU_FASTFLAG(LuauReportSubtypingErrors)
-LUAU_FASTFLAG(LuauEagerGeneralization4)
-LUAU_FASTFLAG(LuauTableLiteralSubtypeSpecificCheck2)
-LUAU_FASTFLAG(LuauDfgAllowUpdatesInLoops)
+LUAU_FASTFLAG(LuauRefineDistributesOverUnions)
+LUAU_FASTFLAG(LuauReduceSetTypeStackPressure)
 
 using namespace Luau;
 
@@ -67,8 +63,6 @@ TEST_CASE_FIXTURE(TypeStateFixture, "assign_different_values_to_x")
 
 TEST_CASE_FIXTURE(TypeStateFixture, "parameter_x_was_constrained_by_two_types")
 {
-    ScopedFastFlag _{FFlag::LuauTableLiteralSubtypeSpecificCheck2, true};
-
     // Parameter `x` has a fresh type `'x` bounded by `never` and `unknown`.
     // The first use of `x` constrains `x`'s upper bound by `string | number`.
     // The second use of `x`, aliased by `y`, constrains `x`'s upper bound by `string?`.
@@ -269,8 +263,6 @@ TEST_CASE_FIXTURE(TypeStateFixture, "local_assigned_in_only_one_branch_that_fall
 
 TEST_CASE_FIXTURE(TypeStateFixture, "then_branch_assigns_and_else_branch_also_assigns_but_is_met_with_return")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         local x = nil
         if math.random() > 0.5 then
@@ -288,8 +280,6 @@ TEST_CASE_FIXTURE(TypeStateFixture, "then_branch_assigns_and_else_branch_also_as
 
 TEST_CASE_FIXTURE(TypeStateFixture, "then_branch_assigns_but_is_met_with_return_and_else_branch_assigns")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         local x = nil
         if math.random() > 0.5 then
@@ -350,7 +340,6 @@ TEST_CASE_FIXTURE(TypeStateFixture, "local_t_is_assigned_a_fresh_table_with_x_as
 
 TEST_CASE_FIXTURE(TypeStateFixture, "captured_locals_do_not_mutate_upvalue_type")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
     CheckResult result = check(R"(
         local x = nil
 
@@ -372,7 +361,12 @@ TEST_CASE_FIXTURE(TypeStateFixture, "captured_locals_do_not_mutate_upvalue_type"
 
 TEST_CASE_FIXTURE(TypeStateFixture, "captured_locals_do_not_mutate_upvalue_type_2")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauRefineDistributesOverUnions, true},
+        {FFlag::LuauReduceSetTypeStackPressure, true},
+    };
+
     CheckResult result = check(R"(
         local t = {x = nil}
 
@@ -387,10 +381,9 @@ TEST_CASE_FIXTURE(TypeStateFixture, "captured_locals_do_not_mutate_upvalue_type_
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     auto err = get<TypeMismatch>(result.errors[0]);
-    CHECK_EQ("t | { x: number }", toString(err->wantedType));
-    CHECK_EQ("{ x: string }", toString(err->givenType));
-
-    CHECK("{ x: nil } | { x: number }" == toString(requireTypeAtPosition({4, 18}), {true}));
+    CHECK_EQ("number?", toString(err->wantedType));
+    CHECK_EQ("string", toString(err->givenType));
+    CHECK("{ x: number? }" == toString(requireTypeAtPosition({4, 18}), {true}));
     CHECK("number?" == toString(requireTypeAtPosition({4, 20})));
 }
 
@@ -413,8 +406,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "prototyped_recursive_functions_but_has_futur
 {
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
-        {FFlag::LuauReportSubtypingErrors, true},
-        {FFlag::LuauEagerGeneralization4, true},
     };
 
     CheckResult result = check(R"(
@@ -475,25 +466,6 @@ TEST_CASE_FIXTURE(TypeStateFixture, "typestates_preserve_error_suppression")
 
     LUAU_REQUIRE_NO_ERRORS(result);
     CHECK("*error-type* | string" == toString(requireTypeAtPosition({3, 14}), {true}));
-}
-
-
-TEST_CASE_FIXTURE(BuiltinsFixture, "typestates_preserve_error_suppression_properties")
-{
-    // early return if the flag isn't set since this is blocking gated commits
-    // unconditional return
-    // CLI-117098 Type states with error suppressing properties doesn't infer the correct type for properties.
-    if (!FFlag::LuauSolverV2 || FFlag::LuauSolverV2)
-        return;
-
-    CheckResult result = check(R"(
-        local a: {x: any} = {x = 51}
-        a.x = "pickles" -- We'll have a new DefId for this iteration of `a.x`.  Its type must also be error-suppressing
-        print(a.x)
-    )");
-
-    LUAU_REQUIRE_NO_ERRORS(result);
-    CHECK("*error-type* | string" == toString(requireTypeAtPosition({3, 16}), {true}));
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "typestates_do_not_apply_to_the_initial_local_definition")
@@ -577,8 +549,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "fuzzer_normalized_type_variables_are_bad" * 
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "oss_1547_simple")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local rand = 0
 
@@ -594,8 +564,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "oss_1547_simple")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "oss_1547")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local rand = 0
 
@@ -624,13 +592,14 @@ TEST_CASE_FIXTURE(Fixture, "modify_captured_table_field")
 
     auto randTy = getType("state");
     REQUIRE(randTy);
-    CHECK_EQ("{ x: number }", toString(*randTy, {true}));
+    if (FFlag::LuauSolverV2)
+        CHECK_EQ("{ x: number }", toString(*randTy, {true}));
+    else
+        CHECK_EQ("{| x: number |}", toString(*randTy, {true}));
 }
 
 TEST_CASE_FIXTURE(Fixture, "oss_1561")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
-
     loadDefinition(R"(
         declare class Vector3
             X: number
@@ -655,8 +624,6 @@ TEST_CASE_FIXTURE(Fixture, "oss_1561")
 
 TEST_CASE_FIXTURE(Fixture, "oss_1575")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local flag = true
         local function Flip()
@@ -667,8 +634,6 @@ TEST_CASE_FIXTURE(Fixture, "oss_1575")
 
 TEST_CASE_FIXTURE(Fixture, "capture_upvalue_in_returned_function")
 {
-    ScopedFastFlag _{FFlag::LuauDoNotAddUpvalueTypesToLocalType, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         function def()
             local i : number = 0
@@ -684,8 +649,6 @@ TEST_CASE_FIXTURE(Fixture, "capture_upvalue_in_returned_function")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_else_branch")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         --!strict
         local x
@@ -707,8 +670,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_else_branch")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_if_branch")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         --!strict
         local x
@@ -731,8 +692,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_if_branch")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "refinement_through_erroring")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         --!strict
         type Payload = { payload: number }
@@ -755,9 +714,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "refinement_through_erroring")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "refinement_through_erroring_in_loop")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true}, {FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true}, {FFlag::LuauDfgAllowUpdatesInLoops, true}
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
 
     CheckResult result = check(R"(
         --!strict
@@ -778,8 +735,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "refinement_through_erroring_in_loop")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "type_refinement_in_loop")
 {
-    ScopedFastFlag _{FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true};
-
     CheckResult result = check(R"(
         --!strict
         local function onEachString(t: { string | number })
@@ -800,10 +755,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "type_refinement_in_loop")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_if_branch_and_do_nothing_in_else")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true},
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
 
     CheckResult result = check(R"(
         --!strict
@@ -825,10 +777,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "throw_in_if_branch_and_do_nothing_in_else")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "assign_in_an_if_branch_without_else")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauDfgIfBlocksShouldRespectControlFlow, true},
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
 
     CheckResult result = check(R"(
         --!strict

@@ -75,7 +75,6 @@ struct FragmentAutocompleteResult
 {
     ModulePtr incrementalModule;
     Scope* freshScope;
-    TypeArena arenaForAutocomplete_DEPRECATED;
     AutocompleteResult acResults;
 };
 
@@ -128,7 +127,8 @@ FragmentAutocompleteResult fragmentAutocomplete(
     StringCompletionCallback callback,
     std::optional<Position> fragmentEndPosition = std::nullopt,
     AstStatBlock* recentParse = nullptr,
-    IFragmentAutocompleteReporter* reporter = nullptr
+    IFragmentAutocompleteReporter* reporter = nullptr,
+    bool isInHotComment = false
 );
 
 enum class FragmentAutocompleteStatus

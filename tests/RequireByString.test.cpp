@@ -568,6 +568,20 @@ TEST_CASE_FIXTURE(ReplWithPathFixture, "RegisterRuntimeModule")
     assertOutputContainsAll({"true"});
 }
 
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RegisterRuntimeModuleCaseInsensitive")
+{
+    lua_pushcfunction(L, luarequire_registermodule);
+    lua_pushstring(L, "@test/helloworld");
+    lua_newtable(L);
+    lua_pushstring(L, "hello");
+    lua_pushstring(L, "world");
+    lua_settable(L, -3);
+    lua_call(L, 2, 0);
+
+    runCode(L, "return require('@TeSt/heLLoWoRld').hello == 'world'");
+    assertOutputContainsAll({"true"});
+}
+
 TEST_CASE_FIXTURE(ReplWithPathFixture, "ProxyRequire")
 {
     luarequire_pushproxyrequire(L, requireConfigInit, createCliRequireContext(L));
@@ -715,6 +729,76 @@ TEST_CASE("ParseAliases")
     Luau::Config copyAssignedConfig;
     copyAssignedConfig = config;
     checkContents(copyAssignedConfig);
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireBoolean")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/boolean";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "false"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireBuffer")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/buffer";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "buffer"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireFunction")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/function";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "function"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireNil")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/nil";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "nil"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireNumber")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/number";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "12345"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireString")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/string";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "\"foo\""});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireTable")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/table";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "{\"foo\", \"bar\"}"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireThread")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/thread";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "thread"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireUserdata")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/userdata";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "userdata"});
+}
+
+TEST_CASE_FIXTURE(ReplWithPathFixture, "RequireVector")
+{
+    std::string path = getLuauDirectory(PathType::Relative) + "/tests/require/without_config/types/vector";
+    runProtectedRequire(path);
+    assertOutputContainsAll({"true", "1, 2, 3"});
 }
 
 TEST_SUITE_END();

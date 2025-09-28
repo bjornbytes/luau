@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #pragma once
 
+#include "Luau/BuiltinTypeFunctions.h"
 #include "Luau/Config.h"
 #include "Luau/EqSatSimplification.h"
 #include "Luau/Error.h"
@@ -28,9 +29,8 @@
 LUAU_FASTFLAG(DebugLuauFreezeArena)
 LUAU_FASTFLAG(DebugLuauForceAllNewSolverTests)
 
-LUAU_FASTFLAG(LuauTypeFunOptional)
-LUAU_FASTFLAG(LuauUpdateSetMetatableTypeSignature)
-LUAU_FASTFLAG(LuauUpdateGetMetatableTypeSignature)
+LUAU_FASTFLAG(LuauTidyTypeUtils)
+LUAU_FASTFLAG(DebugLuauAlwaysShowConstraintSolvingIncomplete);
 
 #define DOES_NOT_PASS_NEW_SOLVER_GUARD_IMPL(line) ScopedFastFlag sff_##line{FFlag::LuauSolverV2, FFlag::DebugLuauForceAllNewSolverTests};
 
@@ -152,19 +152,22 @@ struct Fixture
     // Most often those are changes related to builtin type definitions.
     // In that case, flag can be forced to 'true' using the example below:
     // ScopedFastFlag sff_LuauExampleFlagDefinition{FFlag::LuauExampleFlagDefinition, true};
-    ScopedFastFlag sff_LuauUpdateSetMetatableTypeSignature{FFlag::LuauUpdateSetMetatableTypeSignature, true};
-    ScopedFastFlag sff_LuauUpdateGetMetatableTypeSignature{FFlag::LuauUpdateGetMetatableTypeSignature, true};
+
+    ScopedFastFlag sff_TypeUtilTidy{FFlag::LuauTidyTypeUtils, true};
 
     // Arena freezing marks the `TypeArena`'s underlying memory as read-only, raising an access violation whenever you mutate it.
     // This is useful for tracking down violations of Luau's memory model.
     ScopedFastFlag sff_DebugLuauFreezeArena{FFlag::DebugLuauFreezeArena, true};
+
+    // This makes sure that errant cases of constraint solving failing to complete still pop up in tests.
+    ScopedFastFlag sff_DebugLuauAlwaysShowConstraintSolvingIncomplete{FFlag::DebugLuauAlwaysShowConstraintSolvingIncomplete, true};
 
     TestFileResolver fileResolver;
     TestConfigResolver configResolver;
     NullModuleResolver moduleResolver;
     std::unique_ptr<SourceModule> sourceModule;
     InternalErrorReporter ice;
-    
+
 
     std::string decorateWithTypes(const std::string& code);
 
@@ -183,9 +186,12 @@ struct Fixture
     LoadDefinitionFileResult loadDefinition(const std::string& source, bool forAutocomplete = false);
     // TODO: test theory about dynamic dispatch
     NotNull<BuiltinTypes> getBuiltins();
+    const BuiltinTypeFunctions& getBuiltinTypeFunctions();
     virtual Frontend& getFrontend();
+
 private:
     bool hasDumpedErrors = false;
+
 protected:
     bool forAutocomplete = false;
     std::optional<Frontend> frontend;
@@ -200,7 +206,6 @@ struct BuiltinsFixture : Fixture
     explicit BuiltinsFixture(bool prepareAutocomplete = false);
 
     // For the purpose of our tests, we're always the latest version of type functions.
-    ScopedFastFlag sff_optionalInTypeFunctionLib{FFlag::LuauTypeFunOptional, true};
     Frontend& getFrontend() override;
 };
 

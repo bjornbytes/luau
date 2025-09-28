@@ -18,8 +18,7 @@ LUAU_FASTINT(LuauTarjanChildLimit)
 LUAU_FASTINT(LuauTypeInferIterationLimit)
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
 LUAU_FASTINT(LuauTypeInferTypePackLoopLimit)
-LUAU_FASTFLAG(LuauDfgAllowUpdatesInLoops)
-LUAU_FASTFLAG(LuauSolverAgnosticStringification)
+LUAU_FASTFLAG(LuauNoMoreComparisonTypeFunctions)
 
 TEST_SUITE_BEGIN("ProvisionalTests");
 
@@ -300,10 +299,10 @@ TEST_CASE_FIXTURE(Fixture, "discriminate_from_x_not_equal_to_nil")
     }
     else
     {
-        CHECK_EQ("{| x: string, y: number |}", toString(requireTypeAtPosition({5, 28})));
+        CHECK_EQ("{ x: string, y: number }", toString(requireTypeAtPosition({5, 28})));
 
         // Should be {| x: nil, y: nil |}
-        CHECK_EQ("{| x: nil, y: nil |} | {| x: string, y: number |}", toString(requireTypeAtPosition({7, 28})));
+        CHECK_EQ("{ x: nil, y: nil } | { x: string, y: number }", toString(requireTypeAtPosition({7, 28})));
     }
 }
 
@@ -535,7 +534,6 @@ TEST_CASE_FIXTURE(Fixture, "dcr_can_partially_dispatch_a_constraint")
 
 TEST_CASE_FIXTURE(Fixture, "free_options_cannot_be_unified_together")
 {
-    ScopedFastFlag sff_stringification{FFlag::LuauSolverAgnosticStringification, true};
     ScopedFastFlag sff{FFlag::LuauSolverV2, false};
 
     TypeArena arena;
@@ -854,9 +852,9 @@ TEST_CASE_FIXTURE(Fixture, "assign_table_with_refined_property_with_a_similar_ty
         LUAU_REQUIRE_ERROR_COUNT(1, result);
         const std::string expected =
             R"(Type
-	'{| x: number? |}'
+	'{ x: number? }'
 could not be converted into
-	'{| x: number |}'
+	'{ x: number }'
 caused by:
   Property 'x' is not compatible.
 Type 'number?' could not be converted into 'number' in an invariant context)";
@@ -964,7 +962,6 @@ TEST_CASE_FIXTURE(Fixture, "floating_generics_should_not_be_allowed")
 
 TEST_CASE_FIXTURE(Fixture, "free_options_can_be_unified_together")
 {
-    ScopedFastFlag sff_stringification{FFlag::LuauSolverAgnosticStringification, true};
     ScopedFastFlag sff{FFlag::LuauSolverV2, false};
 
     TypeArena arena;
@@ -1303,6 +1300,8 @@ TEST_CASE_FIXTURE(Fixture, "table_containing_non_final_type_is_erroneously_cache
 // CLI-111113
 TEST_CASE_FIXTURE(Fixture, "we_cannot_infer_functions_that_return_inconsistently")
 {
+    ScopedFastFlag sff{FFlag::LuauNoMoreComparisonTypeFunctions, true};
+
     CheckResult result = check(R"(
         function find_first<T>(tbl: {T}, el)
             for i, e in tbl do
@@ -1326,7 +1325,7 @@ TEST_CASE_FIXTURE(Fixture, "we_cannot_infer_functions_that_return_inconsistently
 
     if (FFlag::LuauSolverV2)
     {
-        LUAU_CHECK_ERROR_COUNT(2, result);
+        LUAU_CHECK_ERROR_COUNT(1, result);
         CHECK("<T>({T}, unknown) -> number" == toString(requireType("find_first")));
     }
     else
@@ -1340,10 +1339,8 @@ TEST_CASE_FIXTURE(Fixture, "we_cannot_infer_functions_that_return_inconsistently
 
 TEST_CASE_FIXTURE(Fixture, "loop_unsoundness")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauDfgAllowUpdatesInLoops, true},
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+
     // This is a tactical unsoundness we're introducing to resolve issues around
     // cyclic types. You can see that if this loop were to run more than once,
     // we'd error as we'd try to call a number.
@@ -1353,6 +1350,60 @@ TEST_CASE_FIXTURE(Fixture, "loop_unsoundness")
             f = f()
         end
     )"));
+}
+
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "refine_unknown_to_table_and_test_two_props")
+{
+    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+
+    CheckResult result = check(R"(
+        local function f(x: unknown): string
+            if typeof(x) == 'table' then
+                if typeof(x.foo) == 'string' and typeof(x.bar) == 'string' then
+                    return x.foo .. x.bar
+                end
+            end
+            return ''
+        end
+    )");
+
+    // We'd like for this to be 0
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    CHECK_MESSAGE(get<UnknownProperty>(result.errors[0]), "Expected UnknownProperty but got " << result.errors[0]);
+    CHECK(Position{3, 56} == result.errors[0].location.begin);
+    CHECK(Position{3, 61} == result.errors[0].location.end);
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "function_indexer_satisfies_reading_property")
+{
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+
+    // We would like this code to have _no_ errors, but it requires one of:
+    //  (a) Being able to express read-only indexers, as that is the type of
+    //      `__index` when it is a function.
+    //  (b) Metatable aware semantic subtyping for tables.
+    CheckResult result = check(R"(
+        local t = setmetatable({}, {
+            __index = function (_, _prop: string): number
+                return 42
+            end
+        })
+
+        local function readX(tbl: { read X: number })
+            print(tbl.X)
+        end
+
+        -- This should work as `__index` being a function should semantically
+        -- be the same as having an indexer.
+        readX(t)
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    auto err = get<TypeMismatch>(result.errors[0]);
+    REQUIRE(err);
+    CHECK_EQ("{ @metatable { __index: (unknown, string) -> number }, {  } }", toString(err->givenType, { /* exhaustive */ true}));
+    CHECK_EQ("{ read X: number }", toString(err->wantedType));
 }
 
 TEST_SUITE_END();

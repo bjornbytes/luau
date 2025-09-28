@@ -29,6 +29,7 @@ LUAU_FASTFLAG(LuauSolverV2);
 LUAU_FASTFLAG(DebugLuauLogSolverToJsonFile)
 
 LUAU_FASTFLAGVARIABLE(DebugLuauForceAllNewSolverTests);
+LUAU_FASTFLAG(LuauBuiltinTypeFunctionsArentGlobal)
 
 extern std::optional<unsigned> randomSeed; // tests/main.cpp
 
@@ -285,6 +286,7 @@ AstStatBlock* Fixture::parse(const std::string& source, const ParseOptions& pars
             if (FFlag::LuauSolverV2)
             {
                 Mode mode = sourceModule->mode ? *sourceModule->mode : Mode::Strict;
+                Frontend::Stats stats;
                 ModulePtr module = Luau::check(
                     *sourceModule,
                     mode,
@@ -299,6 +301,7 @@ AstStatBlock* Fixture::parse(const std::string& source, const ParseOptions& pars
                     getFrontend().options,
                     {},
                     false,
+                    stats,
                     {}
                 );
 
@@ -687,6 +690,11 @@ NotNull<BuiltinTypes> Fixture::getBuiltins()
     return NotNull{builtinTypes};
 }
 
+const BuiltinTypeFunctions& Fixture::getBuiltinTypeFunctions()
+{
+    return FFlag::LuauBuiltinTypeFunctionsArentGlobal ? *getBuiltins()->typeFunctions : builtinTypeFunctions_DEPRECATED();
+}
+
 Frontend& Fixture::getFrontend()
 {
     if (frontend)
@@ -696,9 +704,10 @@ Frontend& Fixture::getFrontend()
         &fileResolver,
         &configResolver,
         FrontendOptions{
-            /* retainFullTypeGraphs= */ true, /* forAutocomplete */ false, /* runLintChecks */ false, /* randomConstraintResolutionSeed */ randomSeed}
+            /* retainFullTypeGraphs= */ true, /* forAutocomplete */ false, /* runLintChecks */ false, /* randomConstraintResolutionSeed */ randomSeed
+        }
     );
-    
+
     builtinTypes = f.builtinTypes;
     // Fixture::Fixture begins here
     configResolver.defaultConfig.mode = Mode::Strict;
@@ -732,7 +741,6 @@ Frontend& Fixture::getFrontend()
 BuiltinsFixture::BuiltinsFixture(bool prepareAutocomplete)
     : Fixture(prepareAutocomplete)
 {
-   
 }
 
 Frontend& BuiltinsFixture::getFrontend()

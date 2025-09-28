@@ -1252,6 +1252,15 @@ struct Printer
 
             writer.symbol(")");
         }
+        else if (const auto& a = program.as<AstStatDeclareGlobal>())
+        {
+            writer.keyword("declare");
+            writer.advance(a->nameLocation.begin);
+            writer.identifier(a->name.value);
+
+            writer.symbol(":");
+            visualizeTypeAnnotation(*a->type);
+        }
         else
         {
             LUAU_ASSERT(!"Unknown AstStat");
@@ -1446,6 +1455,9 @@ struct Printer
             break;
         case AstAttr::Deprecated:
             writer.keyword("@deprecated");
+            break;
+        case AstAttr::Unknown:
+            writer.keyword("@" + std::string{attribute.name.value});
             break;
         }
     }

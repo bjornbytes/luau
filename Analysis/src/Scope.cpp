@@ -4,6 +4,9 @@
 
 LUAU_FASTFLAG(LuauSolverV2);
 
+LUAU_FASTFLAGVARIABLE(LuauNoScopeShallNotSubsumeAll)
+LUAU_FASTFLAG(LuauNameConstraintRestrictRecursiveTypes)
+
 namespace Luau
 {
 
@@ -218,9 +221,6 @@ std::optional<std::pair<Symbol, Binding>> Scope::linearSearchForBindingPair(cons
 // Updates the `this` scope with the assignments from the `childScope` including ones that doesn't exist in `this`.
 void Scope::inheritAssignments(const ScopePtr& childScope)
 {
-    if (!FFlag::LuauSolverV2)
-        return;
-
     for (const auto& [k, a] : childScope->lvalueTypes)
         lvalueTypes[k] = a;
 }
@@ -228,13 +228,10 @@ void Scope::inheritAssignments(const ScopePtr& childScope)
 // Updates the `this` scope with the refinements from the `childScope` excluding ones that doesn't exist in `this`.
 void Scope::inheritRefinements(const ScopePtr& childScope)
 {
-    if (FFlag::LuauSolverV2)
+    for (const auto& [k, a] : childScope->rvalueRefinements)
     {
-        for (const auto& [k, a] : childScope->rvalueRefinements)
-        {
-            if (lookup(NotNull{k}))
-                rvalueRefinements[k] = a;
-        }
+        if (lookup(NotNull{k}))
+            rvalueRefinements[k] = a;
     }
 
     for (const auto& [k, a] : childScope->refinements)
@@ -252,6 +249,19 @@ bool Scope::shouldWarnGlobal(std::string name) const
         if (current->globalsToWarn.contains(name))
             return true;
     }
+    return false;
+}
+
+bool Scope::isInvalidTypeAliasName(const std::string& name) const
+{
+    LUAU_ASSERT(FFlag::LuauNameConstraintRestrictRecursiveTypes);
+
+    for (auto scope = this; scope; scope = scope->parent.get())
+    {
+        if (scope->invalidTypeAliasNames.contains(name))
+            return true;
+    }
+
     return false;
 }
 
@@ -280,6 +290,12 @@ NotNull<Scope> Scope::findNarrowestScopeContaining(Location location)
 
 bool subsumesStrict(Scope* left, Scope* right)
 {
+    if (FFlag::LuauNoScopeShallNotSubsumeAll)
+    {
+        if (!left || !right)
+            return false;
+    }
+
     while (right)
     {
         if (right->parent.get() == left)
@@ -293,6 +309,12 @@ bool subsumesStrict(Scope* left, Scope* right)
 
 bool subsumes(Scope* left, Scope* right)
 {
+    if (FFlag::LuauNoScopeShallNotSubsumeAll)
+    {
+        if (!left || !right)
+            return false;
+    }
+
     return left == right || subsumesStrict(left, right);
 }
 

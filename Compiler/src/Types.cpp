@@ -773,6 +773,7 @@ struct TypeMapVisitor : AstVisitor
             case LBF_VECTOR_CLAMP:
             case LBF_VECTOR_MIN:
             case LBF_VECTOR_MAX:
+            case LBF_VECTOR_LERP:
                 recordResolvedType(node, &builtinTypes.vectorType);
                 break;
             }

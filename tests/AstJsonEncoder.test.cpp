@@ -105,8 +105,7 @@ TEST_CASE("encode_AstStatBlock")
 
     CHECK(
         toJson(&block) ==
-        (R"({"type":"AstStatBlock","location":"0,0 - 0,0","hasEnd":true,"body":[{"type":"AstStatLocal","location":"0,0 - 0,0","vars":[{"luauType":null,"name":"a_local","type":"AstLocal","location":"0,0 - 0,0"}],"values":[]}]})"
-        )
+        (R"({"type":"AstStatBlock","location":"0,0 - 0,0","hasEnd":true,"body":[{"type":"AstStatLocal","location":"0,0 - 0,0","vars":[{"luauType":null,"name":"a_local","type":"AstLocal","location":"0,0 - 0,0"}],"values":[]}]})")
     );
 }
 
@@ -588,6 +587,20 @@ TEST_CASE_FIXTURE(JsonEncoderFixture, "encode_AstGenericTypePackWithDefault")
 
     std::string_view expected =
         R"({"type":"AstStatTypeAlias","location":"1,8 - 1,40","name":"Foo","generics":[],"genericPacks":[{"type":"AstGenericTypePack","name":"X","luauType":{"type":"AstTypePackVariadic","location":"1,24 - 1,33","variadicType":{"type":"AstTypeReference","location":"1,27 - 1,33","name":"string","nameLocation":"1,27 - 1,33","parameters":[]}}}],"value":{"type":"AstTypeReference","location":"1,37 - 1,40","name":"any","nameLocation":"1,37 - 1,40","parameters":[]},"exported":false})";
+
+    CHECK(toJson(root->body.data[0]) == expected);
+}
+
+TEST_CASE_FIXTURE(JsonEncoderFixture, "encode_AstTypeOptional")
+{
+    AstStatBlock* root = expectParse(R"(
+            type Foo = string?
+        )");
+
+    CHECK(1 == root->body.size);
+
+    std::string_view expected =
+        R"({"type":"AstStatTypeAlias","location":"1,12 - 1,30","name":"Foo","generics":[],"genericPacks":[],"value":{"type":"AstTypeUnion","location":"1,23 - 1,30","types":[{"type":"AstTypeReference","location":"1,23 - 1,29","name":"string","nameLocation":"1,23 - 1,29","parameters":[]},{"type":"AstTypeOptional","location":"1,29 - 1,30"}]},"exported":false})";
 
     CHECK(toJson(root->body.data[0]) == expected);
 }

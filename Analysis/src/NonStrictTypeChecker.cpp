@@ -6,7 +6,6 @@
 #include "Luau/Common.h"
 #include "Luau/Simplify.h"
 #include "Luau/Type.h"
-#include "Luau/Simplify.h"
 #include "Luau/Subtyping.h"
 #include "Luau/Normalize.h"
 #include "Luau/Error.h"
@@ -17,15 +16,15 @@
 #include "Luau/ToString.h"
 #include "Luau/TypeUtils.h"
 
-#include <iostream>
 #include <iterator>
 
 LUAU_FASTFLAG(DebugLuauMagicTypes)
 
-LUAU_FASTFLAGVARIABLE(LuauNewNonStrictVisitTypes2)
-LUAU_FASTFLAGVARIABLE(LuauNewNonStrictFixGenericTypePacks)
 LUAU_FASTFLAGVARIABLE(LuauNewNonStrictMoreUnknownSymbols)
 LUAU_FASTFLAGVARIABLE(LuauNewNonStrictNoErrorsPassingNever)
+LUAU_FASTFLAGVARIABLE(LuauNewNonStrictSuppressesDynamicRequireErrors)
+LUAU_FASTFLAG(LuauEmplaceNotPushBack)
+LUAU_FASTFLAGVARIABLE(LuauUnreducedTypeFunctionsDontTriggerWarnings)
 
 namespace Luau
 {
@@ -43,7 +42,10 @@ struct StackPusher
         : stack(&stack)
         , scope(scope)
     {
-        stack.push_back(NotNull{scope});
+        if (FFlag::LuauEmplaceNotPushBack)
+            stack.emplace_back(scope);
+        else
+            stack.push_back(NotNull{scope});
     }
 
     ~StackPusher()
@@ -240,14 +242,8 @@ struct NonStrictTypeChecker
         if (noTypeFunctionErrors.find(instance))
             return instance;
 
-        ErrorVec errors =
-            reduceTypeFunctions(
-                instance,
-                location,
-                TypeFunctionContext{arena, builtinTypes, stack.back(), simplifier, NotNull{&normalizer}, typeFunctionRuntime, ice, limits},
-                true
-            )
-                .errors;
+        TypeFunctionContext context{arena, builtinTypes, stack.back(), simplifier, NotNull{&normalizer}, typeFunctionRuntime, ice, limits};
+        ErrorVec errors = reduceTypeFunctions(instance, location, NotNull{&context}, true).errors;
 
         if (errors.empty())
             noTypeFunctionErrors.insert(instance);
@@ -340,8 +336,7 @@ struct NonStrictTypeChecker
                 {
                     ctx.remove(dfg->getDef(local));
 
-                    if (FFlag::LuauNewNonStrictVisitTypes2)
-                        visit(local->annotation);
+                    visit(local->annotation);
                 }
             }
             else
@@ -426,8 +421,7 @@ struct NonStrictTypeChecker
 
     NonStrictContext visit(AstStatFor* forStatement)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-            visit(forStatement->var->annotation);
+        visit(forStatement->var->annotation);
 
         // TODO: throwing out context based on same principle as existing code?
         if (forStatement->from)
@@ -441,11 +435,8 @@ struct NonStrictTypeChecker
 
     NonStrictContext visit(AstStatForIn* forInStatement)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-        {
-            for (auto var : forInStatement->vars)
-                visit(var->annotation);
-        }
+        for (auto var : forInStatement->vars)
+            visit(var->annotation);
 
         for (AstExpr* rhs : forInStatement->values)
             visit(rhs, ValueContext::RValue);
@@ -482,11 +473,8 @@ struct NonStrictTypeChecker
 
     NonStrictContext visit(AstStatTypeAlias* typeAlias)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-        {
-            visitGenerics(typeAlias->generics, typeAlias->genericPacks);
-            visit(typeAlias->type);
-        }
+        visitGenerics(typeAlias->generics, typeAlias->genericPacks);
+        visit(typeAlias->type);
 
         return {};
     }
@@ -498,37 +486,30 @@ struct NonStrictTypeChecker
 
     NonStrictContext visit(AstStatDeclareFunction* declFn)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-        {
-            visitGenerics(declFn->generics, declFn->genericPacks);
-            visit(declFn->params);
-            visit(declFn->retTypes);
-        }
+        visitGenerics(declFn->generics, declFn->genericPacks);
+        visit(declFn->params);
+        visit(declFn->retTypes);
 
         return {};
     }
 
     NonStrictContext visit(AstStatDeclareGlobal* declGlobal)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-            visit(declGlobal->type);
+        visit(declGlobal->type);
 
         return {};
     }
 
     NonStrictContext visit(AstStatDeclareExternType* declClass)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
+        if (declClass->indexer)
         {
-            if (declClass->indexer)
-            {
-                visit(declClass->indexer->indexType);
-                visit(declClass->indexer->resultType);
-            }
-
-            for (auto prop : declClass->props)
-                visit(prop.ty);
+            visit(declClass->indexer->indexType);
+            visit(declClass->indexer->resultType);
         }
+
+        for (auto prop : declClass->props)
+            visit(prop.ty);
 
         return {};
     }
@@ -737,13 +718,18 @@ struct NonStrictTypeChecker
                 AstExpr* arg = arguments[i];
                 if (auto runTimeFailureType = willRunTimeError(arg, fresh))
                 {
-                    if (FFlag::LuauNewNonStrictNoErrorsPassingNever)
+                    if (FFlag::LuauUnreducedTypeFunctionsDontTriggerWarnings)
+                        reportError(CheckedFunctionCallError{argTypes[i], *runTimeFailureType, functionName, i}, arg->location);
+                    else
                     {
-                        if (!get<NeverType>(follow(*runTimeFailureType)))
+                        if (FFlag::LuauNewNonStrictNoErrorsPassingNever)
+                        {
+                            if (!get<NeverType>(follow(*runTimeFailureType)))
+                                reportError(CheckedFunctionCallError{argTypes[i], *runTimeFailureType, functionName, i}, arg->location);
+                        }
+                        else
                             reportError(CheckedFunctionCallError{argTypes[i], *runTimeFailureType, functionName, i}, arg->location);
                     }
-                    else
-                        reportError(CheckedFunctionCallError{argTypes[i], *runTimeFailureType, functionName, i}, arg->location);
                 }
             }
 
@@ -793,19 +779,15 @@ struct NonStrictTypeChecker
             }
             remainder.remove(dfg->getDef(local));
 
-            if (FFlag::LuauNewNonStrictVisitTypes2)
-                visit(local->annotation);
+            visit(local->annotation);
         }
 
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-        {
-            visitGenerics(exprFn->generics, exprFn->genericPacks);
+        visitGenerics(exprFn->generics, exprFn->genericPacks);
 
-            visit(exprFn->returnAnnotation);
+        visit(exprFn->returnAnnotation);
 
-            if (exprFn->varargAnnotation)
-                visit(exprFn->varargAnnotation);
-        }
+        if (exprFn->varargAnnotation)
+            visit(exprFn->varargAnnotation);
 
         return remainder;
     }
@@ -836,8 +818,7 @@ struct NonStrictTypeChecker
 
     NonStrictContext visit(AstExprTypeAssertion* typeAssertion)
     {
-        if (FFlag::LuauNewNonStrictVisitTypes2)
-            visit(typeAssertion->annotation);
+        visit(typeAssertion->annotation);
 
         return visit(typeAssertion->expr, ValueContext::RValue);
     }
@@ -868,8 +849,6 @@ struct NonStrictTypeChecker
 
     void visit(AstType* ty)
     {
-        LUAU_ASSERT(FFlag::LuauNewNonStrictVisitTypes2);
-
         // If this node is `nullptr`, early exit.
         if (!ty)
             return;
@@ -892,9 +871,20 @@ struct NonStrictTypeChecker
 
     void visit(AstTypeReference* ty)
     {
-        // No further validation is necessary in this case. The main logic for
-        // _luau_print is contained in lookupAnnotation.
-        if (FFlag::DebugLuauMagicTypes && ty->name == "_luau_print")
+        if (FFlag::DebugLuauMagicTypes)
+        {
+            // No further validation is necessary in this case.
+            if (ty->name == kLuauPrint)
+                return;
+
+            if (ty->name == kLuauForceConstraintSolvingIncomplete)
+            {
+                reportError(ConstraintSolvingIncompleteError{}, ty->location);
+                return;
+            }
+        }
+
+        if (FFlag::DebugLuauMagicTypes && (ty->name == kLuauPrint || ty->name == kLuauForceConstraintSolvingIncomplete))
             return;
 
         for (const AstTypeOrPack& param : ty->parameters)
@@ -1081,8 +1071,6 @@ struct NonStrictTypeChecker
 
     void visit(AstTypePack* pack)
     {
-        LUAU_ASSERT(FFlag::LuauNewNonStrictVisitTypes2);
-
         // If there is no pack node, early exit.
         if (!pack)
             return;
@@ -1114,43 +1102,19 @@ struct NonStrictTypeChecker
         Scope* scope = findInnermostScope(tp->location);
         LUAU_ASSERT(scope);
 
-        if (FFlag::LuauNewNonStrictFixGenericTypePacks)
-        {
-            if (std::optional<TypePackId> alias = scope->lookupPack(tp->genericName.value))
-                return;
+        if (std::optional<TypePackId> alias = scope->lookupPack(tp->genericName.value))
+            return;
 
-            if (scope->lookupType(tp->genericName.value))
-                return reportError(
-                    SwappedGenericTypeParameter{
-                        tp->genericName.value,
-                        SwappedGenericTypeParameter::Kind::Pack,
-                    },
-                    tp->location
-                );
+        if (scope->lookupType(tp->genericName.value))
+            return reportError(
+                SwappedGenericTypeParameter{
+                    tp->genericName.value,
+                    SwappedGenericTypeParameter::Kind::Pack,
+                },
+                tp->location
+            );
 
-            reportError(UnknownSymbol{tp->genericName.value, UnknownSymbol::Context::Type}, tp->location);
-        }
-        else
-        {
-            std::optional<TypePackId> alias = scope->lookupPack(tp->genericName.value);
-            if (!alias.has_value())
-            {
-                if (scope->lookupType(tp->genericName.value))
-                {
-                    reportError(
-                        SwappedGenericTypeParameter{
-                            tp->genericName.value,
-                            SwappedGenericTypeParameter::Kind::Pack,
-                        },
-                        tp->location
-                    );
-                }
-            }
-            else
-            {
-                reportError(UnknownSymbol{tp->genericName.value, UnknownSymbol::Context::Type}, tp->location);
-            }
-        }
+        reportError(UnknownSymbol{tp->genericName.value, UnknownSymbol::Context::Type}, tp->location);
     }
 
     void visitGenerics(AstArray<AstGenericType*> generics, AstArray<AstGenericTypePack*> genericPacks)
@@ -1229,6 +1193,8 @@ struct NonStrictTypeChecker
             {
 
                 TypeId actualType = lookupType(fragment);
+                if (FFlag::LuauUnreducedTypeFunctionsDontTriggerWarnings && shouldSkipRuntimeErrorTesting(actualType))
+                    continue;
                 SubtypingResult r = subtyping.isSubtype(actualType, *contextTy, scope);
                 if (r.normalizationTooComplex)
                     reportError(NormalizationTooComplex{}, fragment->location);
@@ -1270,6 +1236,12 @@ private:
             cachedResult = arena->addType(NegationType{baseType});
         return cachedResult;
     }
+
+    bool shouldSkipRuntimeErrorTesting(TypeId test)
+    {
+        TypeId t = follow(test);
+        return is<NeverType, TypeFunctionInstanceType>(t);
+    }
 };
 
 void checkNonStrict(
@@ -1292,6 +1264,22 @@ void checkNonStrict(
     typeChecker.visit(sourceModule.root);
     unfreeze(module->interfaceTypes);
     copyErrors(module->errors, module->interfaceTypes, builtinTypes);
+
+    if (FFlag::LuauNewNonStrictSuppressesDynamicRequireErrors)
+    {
+        module->errors.erase(
+            std::remove_if(
+                module->errors.begin(),
+                module->errors.end(),
+                [](auto err)
+                {
+                    return get<UnknownRequire>(err) != nullptr;
+                }
+            ),
+            module->errors.end()
+        );
+    }
+
     freeze(module->interfaceTypes);
 }
 

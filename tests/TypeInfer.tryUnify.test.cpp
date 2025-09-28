@@ -47,7 +47,8 @@ TEST_CASE_FIXTURE(TryUnifyFixture, "compatible_functions_are_unified")
     }};
 
     Type functionTwo{TypeVariant{FunctionType(
-        arena.addTypePack({arena.freshType(getBuiltins(), globalScope->level)}), arena.addTypePack({arena.freshType(getBuiltins(), globalScope->level)})
+        arena.addTypePack({arena.freshType(getBuiltins(), globalScope->level)}),
+        arena.addTypePack({arena.freshType(getBuiltins(), globalScope->level)})
     )}};
 
     state.tryUnify(&functionTwo, &functionOne);
@@ -274,6 +275,7 @@ TEST_CASE_FIXTURE(Fixture, "variadics_should_use_reversed_properly")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "cli_41095_concat_log_in_sealed_table_unification")
 {
+
     CheckResult result = check(R"(
         --!strict
         table.insert()
@@ -284,14 +286,15 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "cli_41095_concat_log_in_sealed_table_unifica
     if (FFlag::LuauSolverV2)
         CHECK_EQ(toString(result.errors[1]), "Available overloads: <V>({V}, V) -> (); and <V>({V}, number, V) -> ()");
     else
-        CHECK_EQ(toString(result.errors[1]), "Available overloads: ({a}, a) -> (); and ({a}, number, a) -> ()");
+        CHECK_EQ(toString(result.errors[1]), "Available overloads: ({'a}, 'a) -> (); and ({'a}, number, 'a) -> ()");
 }
 
 TEST_CASE_FIXTURE(TryUnifyFixture, "free_tail_is_grown_properly")
 {
     TypePackId threeNumbers =
         arena.addTypePack(TypePack{{getBuiltins()->numberType, getBuiltins()->numberType, getBuiltins()->numberType}, std::nullopt});
-    TypePackId numberAndFreeTail = arena.addTypePack(TypePack{{getBuiltins()->numberType}, arena.addTypePack(TypePackVar{FreeTypePack{TypeLevel{}}})});
+    TypePackId numberAndFreeTail =
+        arena.addTypePack(TypePack{{getBuiltins()->numberType}, arena.addTypePack(TypePackVar{FreeTypePack{TypeLevel{}}})});
 
     CHECK(state.canUnify(numberAndFreeTail, threeNumbers).empty());
 }

@@ -12,7 +12,7 @@
 #include <algorithm>
 
 LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauRemoveTypeCallsForReadWriteProps)
+LUAU_FASTFLAGVARIABLE(LuauUnfinishedRepeatAncestryFix)
 
 namespace Luau
 {
@@ -32,10 +32,22 @@ struct AutocompleteNodeFinder : public AstVisitor
 
     bool visit(AstExpr* expr) override
     {
-        if (expr->location.begin <= pos && pos <= expr->location.end)
+        if (FFlag::LuauUnfinishedRepeatAncestryFix)
         {
-            ancestry.push_back(expr);
-            return true;
+            // If the expression size is 0 (begin == end), we don't want to include it in the ancestry
+            if (expr->location.begin <= pos && pos <= expr->location.end && expr->location.begin != expr->location.end)
+            {
+                ancestry.push_back(expr);
+                return true;
+            }
+        }
+        else
+        {
+            if (expr->location.begin <= pos && pos <= expr->location.end)
+            {
+                ancestry.push_back(expr);
+                return true;
+            }
         }
         return false;
     }
@@ -526,7 +538,7 @@ static std::optional<DocumentationSymbol> getMetatableDocumentation(
         return std::nullopt;
 
     TypeId followed;
-    if (FFlag::LuauSolverV2 && FFlag::LuauRemoveTypeCallsForReadWriteProps)
+    if (FFlag::LuauSolverV2)
     {
         if (indexIt->second.readTy)
             followed = follow(*indexIt->second.readTy);
@@ -583,7 +595,9 @@ std::optional<DocumentationSymbol> getDocumentationSymbolAtPosition(const Source
                                 return checkOverloadedDocumentationSymbol(module, *ty, parentExpr, propIt->second.documentationSymbol);
                         }
                         else
-                            return checkOverloadedDocumentationSymbol(module, propIt->second.type_DEPRECATED(), parentExpr, propIt->second.documentationSymbol);
+                            return checkOverloadedDocumentationSymbol(
+                                module, propIt->second.type_DEPRECATED(), parentExpr, propIt->second.documentationSymbol
+                            );
                     }
                 }
                 else if (const ExternType* etv = get<ExternType>(parentTy))

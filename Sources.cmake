@@ -7,6 +7,7 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.19")
         Common/include/Luau/BytecodeUtils.h
         Common/include/Luau/DenseHash.h
         Common/include/Luau/ExperimentalFlags.h
+        Common/include/Luau/HashUtil.h
         Common/include/Luau/Variant.h
         Common/include/Luau/VecDeque.h
     )
@@ -172,9 +173,11 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/ApplyTypeFunction.h
     Analysis/include/Luau/AstJsonEncoder.h
     Analysis/include/Luau/AstQuery.h
+    Analysis/include/Luau/AstUtils.h
     Analysis/include/Luau/Autocomplete.h
     Analysis/include/Luau/AutocompleteTypes.h
     Analysis/include/Luau/BuiltinDefinitions.h
+    Analysis/include/Luau/BuiltinTypeFunctions.h
     Analysis/include/Luau/Cancellation.h
     Analysis/include/Luau/Clone.h
     Analysis/include/Luau/Constraint.h
@@ -219,6 +222,7 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/Simplify.h
     Analysis/include/Luau/Substitution.h
     Analysis/include/Luau/Subtyping.h
+    Analysis/include/Luau/SubtypingVariance.h
     Analysis/include/Luau/Symbol.h
     Analysis/include/Luau/TableLiteralInference.h
     Analysis/include/Luau/ToDot.h
@@ -248,15 +252,18 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/include/Luau/Unifier.h
     Analysis/include/Luau/Unifier2.h
     Analysis/include/Luau/UnifierSharedState.h
+    Analysis/include/Luau/UserDefinedTypeFunction.h
     Analysis/include/Luau/VisitType.h
 
     Analysis/src/Anyification.cpp
     Analysis/src/ApplyTypeFunction.cpp
     Analysis/src/AstJsonEncoder.cpp
     Analysis/src/AstQuery.cpp
+    Analysis/src/AstUtils.cpp
     Analysis/src/Autocomplete.cpp
     Analysis/src/AutocompleteCore.cpp
     Analysis/src/BuiltinDefinitions.cpp
+    Analysis/src/BuiltinTypeFunctions.cpp
     Analysis/src/Clone.cpp
     Analysis/src/Constraint.cpp
     Analysis/src/ConstraintGenerator.cpp
@@ -316,6 +323,7 @@ target_sources(Luau.Analysis PRIVATE
     Analysis/src/Unifiable.cpp
     Analysis/src/Unifier.cpp
     Analysis/src/Unifier2.cpp
+    Analysis/src/UserDefinedTypeFunction.cpp
 )
 
 # Luau.EqSat Sources
@@ -490,6 +498,7 @@ if(TARGET Luau.UnitTest)
         tests/NonStrictTypeChecker.test.cpp
         tests/Normalize.test.cpp
         tests/NotNull.test.cpp
+        tests/OverloadResolver.test.cpp
         tests/Parser.test.cpp
         tests/RegisterCallbacks.cpp
         tests/RegisterCallbacks.h

@@ -9,9 +9,10 @@
 
 using namespace Luau;
 
+LUAU_FASTFLAG(LuauNoMoreComparisonTypeFunctions)
+
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
-LUAU_FASTFLAG(LuauSimplifyOutOfLine2)
-LUAU_FASTFLAG(LuauRemoveTypeCallsForReadWriteProps)
+LUAU_FASTFLAG(LuauNoOrderingTypeFunctions)
 
 TEST_SUITE_BEGIN("DefinitionTests");
 
@@ -171,18 +172,19 @@ TEST_CASE_FIXTURE(Fixture, "class_definitions_cannot_overload_non_function")
     REQUIRE(!result.success);
     CHECK_EQ(result.parseResult.errors.size(), 0);
     REQUIRE(bool(result.module));
-    if (FFlag::LuauRemoveTypeCallsForReadWriteProps)
+    if (FFlag::LuauSolverV2)
         REQUIRE_EQ(result.module->errors.size(), 2);
     else
         REQUIRE_EQ(result.module->errors.size(), 1);
+
     GenericError* ge = get<GenericError>(result.module->errors[0]);
     REQUIRE(ge);
-    if (FFlag::LuauRemoveTypeCallsForReadWriteProps)
+    if (FFlag::LuauSolverV2)
         CHECK_EQ("Cannot overload read type of non-function class member 'X'", ge->message);
     else
         CHECK_EQ("Cannot overload non-function class member 'X'", ge->message);
 
-    if (FFlag::LuauRemoveTypeCallsForReadWriteProps)
+    if (FFlag::LuauSolverV2)
     {
         GenericError* ge2 = get<GenericError>(result.module->errors[1]);
         REQUIRE(ge2);
@@ -380,14 +382,8 @@ TEST_CASE_FIXTURE(Fixture, "definitions_symbols_are_generated_for_recursively_re
     const auto& method = cls->props["myMethod"];
     CHECK_EQ(method.documentationSymbol, "@test/globaltype/MyClass.myMethod");
 
-    FunctionType* function;
-    if (FFlag::LuauRemoveTypeCallsForReadWriteProps)
-    {
-        REQUIRE(method.readTy);
-        function = getMutable<FunctionType>(*method.readTy);
-    }
-    else
-        function = getMutable<FunctionType>(method.type_DEPRECATED());
+    REQUIRE(method.readTy);
+    FunctionType* function = getMutable<FunctionType>(*method.readTy);
     REQUIRE(function);
 
     REQUIRE(function->definition.has_value());
@@ -577,9 +573,10 @@ TEST_CASE_FIXTURE(Fixture, "recursive_redefinition_reduces_rightfully")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "cli_142285_reduce_minted_union_func")
 {
-    ScopedFastFlag sffs[] = {
+    ScopedFastFlag sff[] = {
         {FFlag::LuauSolverV2, true},
-        {FFlag::LuauSimplifyOutOfLine2, true},
+        {FFlag::LuauNoMoreComparisonTypeFunctions, true},
+        {FFlag::LuauNoOrderingTypeFunctions, true},
     };
 
     CheckResult result = check(R"(
@@ -600,11 +597,11 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "cli_142285_reduce_minted_union_func")
         return nil
         end
     )");
-    LUAU_REQUIRE_ERROR_COUNT(2, result);
-    // There are three errors in the above snippet, but they should all be where
-    // clause needed errors.
-    for (const auto& e : result.errors)
-        CHECK(get<WhereClauseNeeded>(e));
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+    auto err1 = get<CannotInferBinaryOperation>(result.errors[0]);
+    REQUIRE(err1);
+    CHECK_EQ(err1->suggestedToAnnotate, "item");
+    CHECK_EQ(err1->op, AstExprBinary::Op::CompareLe);
 }
 
 TEST_CASE_FIXTURE(Fixture, "vector3_overflow")

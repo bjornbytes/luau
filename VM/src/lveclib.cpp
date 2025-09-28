@@ -6,6 +6,8 @@
 
 #include <math.h>
 
+LUAU_FASTFLAGVARIABLE(LuauVectorLerp)
+
 static int vector_pack(lua_State* L)
 {
     float x = float(luaL_optnumber(L, 1, 0.f));
@@ -361,6 +363,7 @@ static int vector_call(lua_State* L)
 
 static const luaL_Reg vectorlib[] = {
     {"pack", vector_pack},
+    {"create", vector_pack},
     {"unpack", vector_unpack},
     {"length", vector_length},
     {"normalize", vector_normalize},

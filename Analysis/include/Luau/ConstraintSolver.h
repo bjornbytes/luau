@@ -13,6 +13,7 @@
 #include "Luau/Normalize.h"
 #include "Luau/OrderedSet.h"
 #include "Luau/Substitution.h"
+#include "Luau/SubtypingVariance.h"
 #include "Luau/ToString.h"
 #include "Luau/Type.h"
 #include "Luau/TypeCheckLimits.h"
@@ -39,6 +40,20 @@ using BlockedConstraintId = Variant<TypeId, TypePackId, const Constraint*>;
 struct HashBlockedConstraintId
 {
     size_t operator()(const BlockedConstraintId& bci) const;
+};
+
+struct SubtypeConstraintRecord
+{
+    TypeId subTy = nullptr;
+    TypeId superTy = nullptr;
+    SubtypingVariance variance = SubtypingVariance::Invalid;
+
+    bool operator==(const SubtypeConstraintRecord& other) const;
+};
+
+struct HashSubtypeConstraintRecord
+{
+    size_t operator()(const SubtypeConstraintRecord& c) const;
 };
 
 struct ModuleResolver;
@@ -93,7 +108,7 @@ struct ConstraintSolver
     std::vector<NotNull<Constraint>> constraints;
     NotNull<DenseHashMap<Scope*, TypeId>> scopeToFunction;
     NotNull<Scope> rootScope;
-    ModuleName currentModuleName;
+    ModulePtr module;
 
     // The dataflow graph of the program, used in constraint generation and for magic functions.
     NotNull<const DataFlowGraph> dfg;
@@ -101,6 +116,11 @@ struct ConstraintSolver
     // Constraints that the solver has generated, rather than sourcing from the
     // scope tree.
     std::vector<std::unique_ptr<Constraint>> solverConstraints;
+
+    // Ticks downward toward zero each time a new constraint is pushed into
+    // solverConstraints. When this counter reaches zero, the type inference
+    // engine reports a CodeTooComplex error and aborts.
+    size_t solverConstraintLimit = 0;
 
     // This includes every constraint that has not been fully solved.
     // A constraint can be both blocked and unsolved, for instance.
@@ -122,15 +142,13 @@ struct ConstraintSolver
     // A mapping from free types to the number of unresolved constraints that mention them.
     DenseHashMap<TypeId, size_t> unresolvedConstraints{{}};
 
-    // Clip with LuauUseOrderedTypeSetsInConstraints
-    std::unordered_map<NotNull<const Constraint>, DenseHashSet<TypeId>> maybeMutatedFreeTypes_DEPRECATED;
-    std::unordered_map<TypeId, DenseHashSet<const Constraint*>> mutatedFreeTypeToConstraint_DEPRECATED;
-
     std::unordered_map<NotNull<const Constraint>, TypeIds> maybeMutatedFreeTypes;
     std::unordered_map<TypeId, OrderedSet<const Constraint*>> mutatedFreeTypeToConstraint;
 
     // Irreducible/uninhabited type functions or type pack functions.
     DenseHashSet<const void*> uninhabitedTypeFunctions{{}};
+
+    DenseHashMap<SubtypeConstraintRecord, Constraint*, HashSubtypeConstraintRecord> seenConstraints{{}};
 
     // The set of types that will definitely be unchanged by generalization.
     DenseHashSet<TypeId> generalizedTypes_{nullptr};
@@ -151,7 +169,7 @@ struct ConstraintSolver
         NotNull<Normalizer> normalizer,
         NotNull<Simplifier> simplifier,
         NotNull<TypeFunctionRuntime> typeFunctionRuntime,
-        ModuleName moduleName,
+        ModulePtr module,
         NotNull<ModuleResolver> moduleResolver,
         std::vector<RequireCycle> requireCycles,
         DcrLogger* logger,
@@ -160,6 +178,7 @@ struct ConstraintSolver
         ConstraintSet constraintSet
     );
 
+    // TODO CLI-169086: Replace all uses of this constructor with the ConstraintSet constructor, above.
     explicit ConstraintSolver(
         NotNull<Normalizer> normalizer,
         NotNull<Simplifier> simplifier,
@@ -167,7 +186,7 @@ struct ConstraintSolver
         NotNull<Scope> rootScope,
         std::vector<NotNull<Constraint>> constraints,
         NotNull<DenseHashMap<Scope*, TypeId>> scopeToFunction,
-        ModuleName moduleName,
+        ModulePtr module,
         NotNull<ModuleResolver> moduleResolver,
         std::vector<RequireCycle> requireCycles,
         DcrLogger* logger,
@@ -231,8 +250,7 @@ public:
     bool tryDispatch(const NameConstraint& c, NotNull<const Constraint> constraint);
     bool tryDispatch(const TypeAliasExpansionConstraint& c, NotNull<const Constraint> constraint);
     bool tryDispatch(const FunctionCallConstraint& c, NotNull<const Constraint> constraint, bool force);
-    bool tryDispatch(const TableCheckConstraint& c, NotNull<const Constraint> constraint);
-    bool tryDispatch(const FunctionCheckConstraint& c, NotNull<const Constraint> constraint);
+    bool tryDispatch(const FunctionCheckConstraint& c, NotNull<const Constraint> constraint, bool force);
     bool tryDispatch(const PrimitiveTypeConstraint& c, NotNull<const Constraint> constraint);
     bool tryDispatch(const HasPropConstraint& c, NotNull<const Constraint> constraint);
 
@@ -254,9 +272,10 @@ public:
     bool tryDispatch(const ReducePackConstraint& c, NotNull<const Constraint> constraint, bool force);
     bool tryDispatch(const EqualityConstraint& c, NotNull<const Constraint> constraint);
 
-    bool tryDispatch(const SimplifyConstraint& c, NotNull<const Constraint> constraint);
+    bool tryDispatch(const SimplifyConstraint& c, NotNull<const Constraint> constraint, bool force);
 
     bool tryDispatch(const PushFunctionTypeConstraint& c, NotNull<const Constraint> constraint);
+    bool tryDispatch(const PushTypeConstraint& c, NotNull<const Constraint> constraint, bool force);
 
     // for a, ... in some_table do
     // also handles __iter metamethod
@@ -281,7 +300,7 @@ public:
         ValueContext context,
         bool inConditional,
         bool suppressSimplification,
-        DenseHashSet<TypeId>& seen
+        Set<TypeId>& seen
     );
 
     /**

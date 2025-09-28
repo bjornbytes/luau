@@ -11,7 +11,7 @@
 
 #include <string.h>
 
-LUAU_FASTFLAG(LuauYieldableContinuations)
+LUAU_FASTFLAG(LuauStacklessPcall)
 
 // convert a stack index to positive
 #define abs_index(L, i) ((i) > 0 || (i) <= LUA_REGISTRYINDEX ? (i) : lua_gettop(L) + (i) + 1)
@@ -368,16 +368,23 @@ const char* luaL_typename(lua_State* L, int idx)
 
 int luaL_callyieldable(lua_State* L, int nargs, int nresults)
 {
-    LUAU_ASSERT(FFlag::LuauYieldableContinuations);
-
     api_check(L, iscfunction(L->ci->func));
     Closure* cl = clvalue(L->ci->func);
     api_check(L, cl->c.cont);
 
     lua_call(L, nargs, nresults);
 
-    if (L->status == LUA_YIELD || L->status == LUA_BREAK)
-        return -1; // -1 is a marker for yielding from C
+    if (FFlag::LuauStacklessPcall)
+    {
+        // yielding means we need to propagate yield; resume will call continuation function later
+        if (isyielded(L))
+            return C_CALL_YIELD;
+    }
+    else
+    {
+        if (L->status == LUA_YIELD || L->status == LUA_BREAK)
+            return -1; // -1 is a marker for yielding from C
+    }
 
     return cl->c.cont(L, LUA_OK);
 }

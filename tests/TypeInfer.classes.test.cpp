@@ -15,7 +15,9 @@ using namespace Luau;
 using std::nullopt;
 
 LUAU_FASTFLAG(LuauSolverV2)
-LUAU_FASTFLAG(LuauTableLiteralSubtypeCheckFunctionCalls)
+LUAU_FASTFLAG(LuauMorePreciseExternTableRelation)
+LUAU_FASTFLAG(LuauPushTypeConstraint2)
+LUAU_FASTFLAG(LuauExternTableIndexersIntersect)
 
 TEST_SUITE_BEGIN("TypeInferExternTypes");
 
@@ -442,8 +444,6 @@ b.X = 2 -- real Vector2.X is also read-only
 
 TEST_CASE_FIXTURE(ExternTypeFixture, "detailed_class_unification_error")
 {
-    ScopedFastFlag _{FFlag::LuauTableLiteralSubtypeCheckFunctionCalls, true};
-
     CheckResult result = check(R"(
 local function foo(v)
     return v.X :: number + string.len(v.Y)
@@ -786,16 +786,18 @@ TEST_CASE_FIXTURE(Fixture, "read_write_class_properties")
     TypeId scriptType =
         arena.addType(ExternType{"Script", {{"Parent", Property::rw(workspaceType, instanceType)}}, instanceType, nullopt, {}, {}, "Test", {}});
 
-    TypeId partType = arena.addType(ExternType{
-        "Part",
-        {{"BrickColor", Property::rw(getBuiltins()->stringType)}, {"Parent", Property::rw(workspaceType, instanceType)}},
-        instanceType,
-        nullopt,
-        {},
-        {},
-        "Test",
-        {}
-    });
+    TypeId partType = arena.addType(
+        ExternType{
+            "Part",
+            {{"BrickColor", Property::rw(getBuiltins()->stringType)}, {"Parent", Property::rw(workspaceType, instanceType)}},
+            instanceType,
+            nullopt,
+            {},
+            {},
+            "Test",
+            {}
+        }
+    );
 
     getMutable<ExternType>(workspaceType)->props = {{"Script", Property::readonly(scriptType)}, {"Part", Property::readonly(partType)}};
 
@@ -892,6 +894,245 @@ TEST_CASE_FIXTURE(ExternTypeFixture, "cyclic_tables_are_assumed_to_be_compatible
     )");
 
     LUAU_REQUIRE_NO_ERRORS(result);
+}
+
+TEST_CASE_FIXTURE(ExternTypeFixture, "ice_while_checking_script_due_to_scopes_not_being_solver_agnostic")
+{
+    // This is intentional - if LuauSolverV2 is false, but we elect the new solver, we should still follow
+    // new solver code paths.
+    // This is necessary to repro an ice that can occur in studio
+    ScopedFastFlag luauSolverOff{FFlag::LuauSolverV2, false};
+    getFrontend().setLuauSolverMode(SolverMode::New);
+
+    auto result = check(R"(
+local function ExitSeat(player, character, seat, weld)
+    --Find vehicle model
+    local model
+    local newParent = seat
+    repeat
+        model = newParent
+        newParent = model.Parent
+    until newParent.ClassName ~= "Model"
+    local part, _ = Raycast(seat.Position, dir, dist, {character, model})
+end
+)");
+    LUAU_REQUIRE_ERRORS(result);
+}
+
+TEST_CASE_FIXTURE(Fixture, "extern_type_check_missing_key")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            Enabled: boolean
+            function Disable(self): ()
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local isUsingGamepad = false
+        local isModalVisible = false
+
+        local function updateGamepadCursor(foo: Foobar)
+            local shouldEnableCursor = isUsingGamepad and isModalVisible
+
+            if foo.IsEnabled == shouldEnableCursor then
+                return
+            end
+
+            if not shouldEnableCursor then
+                foo:Disable()
+            end
+        end
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, results);
+    auto err = get<UnknownProperty>(results.errors[0]);
+    CHECK_EQ("IsEnabled", err->key);
+}
+
+TEST_CASE_FIXTURE(Fixture, "extern_type_check_present_key_in_superclass")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type FoobarParent with
+            IsEnabled: boolean
+        end
+        declare extern type Foobar extends FoobarParent with
+            function Disable(self): ()
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local isUsingGamepad = false
+        local isModalVisible = false
+
+        local function updateGamepadCursor(foo: Foobar)
+            local shouldEnableCursor = isUsingGamepad and isModalVisible
+
+            if foo.IsEnabled == shouldEnableCursor then
+                return
+            end
+
+            if not shouldEnableCursor then
+                foo:Disable()
+            end
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(results);
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_check_key_becomes_never")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            IsEnabled: string
+        end
+
+        declare extern type Bing with
+            IsEnabled: number
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local function update(foo: Foobar | Bing)
+            assert(type(foo.IsEnabled) == "number")
+            return foo
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(results);
+    CHECK_EQ("(Bing | Foobar) -> Bing", toString(requireType("update")));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_check_key_becomes_intersection")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            IsEnabled: string | boolean
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local function update(foo: Foobar)
+            assert(type(foo.IsEnabled) == "string")
+            return foo
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(results);
+    CHECK_EQ("(Foobar) -> Foobar & { read IsEnabled: string }", toString(requireType("update")));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_check_key_superset")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauPushTypeConstraint2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            IsEnabled: string
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local function update(foo: Foobar)
+            assert(type(foo.IsEnabled) == "string" or type(foo.IsEnabled) == "number")
+            return foo
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(results);
+    CHECK_EQ("(Foobar) -> Foobar", toString(requireType("update")));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_check_key_idempotent")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            IsEnabled: string
+        end
+    )");
+
+    CheckResult results = check(R"(
+        local function update(foo: Foobar)
+            assert(type(foo.IsEnabled) == "string")
+            return foo
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(results);
+    CHECK_EQ("(Foobar) -> Foobar", toString(requireType("update")));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_intersect_with_table_indexer")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+        {FFlag::LuauExternTableIndexersIntersect, true},
+    };
+
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        local function f(obj: { [any]: any }, functionName: string)
+            if typeof(obj) == "userdata" then
+                local _ = obj[functionName]
+            end
+        end
+    )"));
+
+    CHECK_EQ("class & { [any]: any }", toString(requireTypeAtPosition({3, 28})));
+}
+
+TEST_CASE_FIXTURE(BuiltinsFixture, "extern_type_with_indexer_intersect_table")
+{
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauSolverV2, true},
+        {FFlag::LuauMorePreciseExternTableRelation, true},
+        {FFlag::LuauExternTableIndexersIntersect, true},
+    };
+
+    loadDefinition(R"(
+        declare extern type Foobar with
+            [string]: unknown
+        end
+    )");
+
+    LUAU_REQUIRE_NO_ERRORS(check(R"(
+        local function update(obj: Foobar)
+            assert(typeof(obj.Baz) == "number")
+            return obj
+        end
+    )"));
+
+    CHECK_EQ("(Foobar) -> Foobar & { read Baz: number }", toString(requireType("update")));
 }
 
 TEST_SUITE_END();
