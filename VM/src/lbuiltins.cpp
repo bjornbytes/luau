@@ -1756,6 +1756,229 @@ static int luauF_lerp(lua_State* L, StkId res, TValue* arg0, int nresults, StkId
     return -1;
 }
 
+static int luauF_vectorpack(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && nresults <= 1 && ttisnumber(arg0))
+    {
+        float x = (float)nvalue(arg0);
+        float y = nparams >= 2 && ttisnumber(args) ? (float)nvalue(args) : x;
+        float z = nparams >= 3 && ttisnumber(args + 1) ? (float)nvalue(args + 1) : x;
+
+#if LUA_VECTOR_SIZE == 4
+        float w = nparams >= 4 && ttisnumber(args + 2) ? (float)nvalue(args + 2) : x;
+        setvvalue(res, x, y, z, w);
+#else
+        setvvalue(res, x, y, z, 0.0f);
+#endif
+
+        return 1;
+    }
+
+    return -1;
+}
+
+static int luauF_vectorunpack(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && ttisvector(arg0))
+    {
+        const float* v = vvalue(arg0);
+
+#if LUA_VECTOR_SIZE == 4
+        if (nresults <= 4)
+        {
+            setnvalue(res, v[0]);
+            if (nresults >= 2) setnvalue(res + 1, v[1]);
+            if (nresults >= 3) setnvalue(res + 2, v[2]);
+            if (nresults >= 4) setnvalue(res + 3, v[3]);
+            return nresults < 0 ? 4 : nresults;
+        }
+#else
+        if (nresults <= 3)
+        {
+            setnvalue(res, v[0]);
+            if (nresults >= 2) setnvalue(res + 1, v[1]);
+            if (nresults >= 3) setnvalue(res + 2, v[2]);
+            return nresults < 0 ? 3 : nresults;
+        }
+#endif
+    }
+
+    return -1;
+}
+
+static int luauF_vectordistance(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 2 && nresults <= 1 && ttisvector(arg0) && ttisvector(args))
+    {
+        const float* a = vvalue(arg0);
+        const float* b = vvalue(args);
+
+        float dx = a[0] - b[0];
+        float dy = a[1] - b[1];
+        float dz = a[2] - b[2];
+
+#if LUA_VECTOR_SIZE == 4
+        float dw = a[3] - b[3];
+        setnvalue(res, sqrtf(dx * dx + dy * dy + dz * dz + dw * dw));
+#else
+        setnvalue(res, sqrtf(dx * dx + dy * dy + dz * dz));
+#endif
+
+        return 1;
+    }
+
+    return -1;
+}
+
+static int luauF_quaternionpack(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nresults <= 1)
+    {
+        if (nparams == 0 || (nparams >= 1 && ttisnil(arg0)))
+        {
+            setqvalue(res, 0.f, 0.f, 0.f, 1.f);
+            return 1;
+        }
+        else if (nparams >= 4 && ttisnumber(arg0) && ttisnumber(args) && ttisnumber(args + 1) && ttisnumber(args + 2))
+        {
+            float x = (float)nvalue(arg0);
+            float y = (float)nvalue(args);
+            float z = (float)nvalue(args + 1);
+            float w = (float)nvalue(args + 2);
+
+            float length2 = x * x + y * y + z * z + w * w;
+
+            if (length2 < 1e-10f)
+            {
+                setqvalue(res, 0.f, 0.f, 0.f, 1.f);
+            }
+            else
+            {
+                float length = sqrtf(length2);
+                setqvalue(res, x / length, y / length, z / length, w / length);
+            }
+
+            return 1;
+        }
+    }
+
+    return -1;
+}
+
+static int luauF_quaternionunpack(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && ttisquaternion(arg0))
+    {
+        const short* q = qvalue(arg0);
+
+        if (nresults <= 4)
+        {
+            float x = luaui_maxf(q[0] / 32767.f, -1.f);
+            float y = luaui_maxf(q[1] / 32767.f, -1.f);
+            float z = luaui_maxf(q[2] / 32767.f, -1.f);
+            float w = luaui_maxf(q[3] / 32767.f, -1.f);
+
+            setnvalue(res, x);
+            if (nresults >= 2) setnvalue(res + 1, y);
+            if (nresults >= 3) setnvalue(res + 2, z);
+            if (nresults >= 4) setnvalue(res + 3, w);
+            return nresults < 0 ? 4 : nresults;
+        }
+    }
+
+    return -1;
+}
+
+static int luauF_quaternionconjugate(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && nresults <= 1 && ttisquaternion(arg0))
+    {
+        const short* q = qvalue(arg0);
+        float x = luaui_maxf(q[0] / 32767.f, -1.f);
+        float y = luaui_maxf(q[1] / 32767.f, -1.f);
+        float z = luaui_maxf(q[2] / 32767.f, -1.f);
+        float w = luaui_maxf(q[3] / 32767.f, -1.f);
+
+        setqvalue(res, -x, -y, -z, w);
+        return 1;
+    }
+
+    return -1;
+}
+
+static int luauF_quaternionangleaxis(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 4 && nresults <= 1 && ttisnumber(arg0) && ttisnumber(args) && ttisnumber(args + 1) && ttisnumber(args + 2))
+    {
+        float angle = (float)nvalue(arg0);
+        float ax = (float)nvalue(args);
+        float ay = (float)nvalue(args + 1);
+        float az = (float)nvalue(args + 2);
+
+        float s = sinf(angle * 0.5f);
+        float c = cosf(angle * 0.5f);
+        float length = sqrtf(ax * ax + ay * ay + az * az);
+        if (length > 0.f) s /= length;
+
+        setqvalue(res, s * ax, s * ay, s * az, c);
+        return 1;
+    }
+
+    return -1;
+}
+
+static int luauF_quaterniontoangleaxis(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && ttisquaternion(arg0))
+    {
+        const short* q = qvalue(arg0);
+        float x = luaui_maxf(q[0] / 32767.f, -1.f);
+        float y = luaui_maxf(q[1] / 32767.f, -1.f);
+        float z = luaui_maxf(q[2] / 32767.f, -1.f);
+        float w = luaui_maxf(q[3] / 32767.f, -1.f);
+
+        if (nresults <= 4)
+        {
+            float s = sqrtf(1.f - w * w);
+            s = s < 0.0001f ? 1.f : 1.f / s;
+
+            setnvalue(res, 2.f * acosf(w));
+            if (nresults >= 2) setnvalue(res + 1, x * s);
+            if (nresults >= 3) setnvalue(res + 2, y * s);
+            if (nresults >= 4) setnvalue(res + 3, z * s);
+            return nresults < 0 ? 4 : nresults;
+        }
+    }
+
+    return -1;
+}
+
+static int luauF_quaterniondirection(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
+{
+    if (nparams >= 1 && nresults <= 1 && ttisquaternion(arg0))
+    {
+        const short* q = qvalue(arg0);
+        float qx = luaui_maxf(q[0] / 32767.f, -1.f);
+        float qy = luaui_maxf(q[1] / 32767.f, -1.f);
+        float qz = luaui_maxf(q[2] / 32767.f, -1.f);
+        float qw = luaui_maxf(q[3] / 32767.f, -1.f);
+
+        float x = -2.f * qx * qz - 2.f * qw * qy;
+        float y = -2.f * qy * qz + 2.f * qw * qx;
+        float z = -1.f + 2.f * qx * qx + 2.f * qy * qy;
+
+#if LUA_VECTOR_SIZE == 4
+        setvvalue(res, x, y, z, 0.f);
+#else
+        setvvalue(res, x, y, z, 0.f);
+#endif
+
+        return 1;
+    }
+
+    return -1;
+}
+
 static int luauF_missing(lua_State* L, StkId res, TValue* arg0, int nresults, StkId args, int nparams)
 {
     return -1;
@@ -1954,6 +2177,17 @@ const luau_FastFunction luauF_table[256] = {
     luauF_lerp,
 
     luauF_vectorlerp,
+
+    luauF_vectorpack,
+    luauF_vectorunpack,
+    luauF_vectordistance,
+
+    luauF_quaternionpack,
+    luauF_quaternionunpack,
+    luauF_quaternionconjugate,
+    luauF_quaternionangleaxis,
+    luauF_quaterniontoangleaxis,
+    luauF_quaterniondirection,
 
 // When adding builtins, add them above this line; what follows is 64 "dummy" entries with luauF_missing fallback.
 // This is important so that older versions of the runtime that don't support newer builtins automatically fall back via luauF_missing.

@@ -231,10 +231,16 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
     {
         if (builtin.method == "create")
             return LBF_VECTOR;
+        if (builtin.method == "pack")
+            return LBF_VECTOR_PACK;
+        if (builtin.method == "unpack")
+            return LBF_VECTOR_UNPACK;
         if (builtin.method == "magnitude")
             return LBF_VECTOR_MAGNITUDE;
         if (builtin.method == "normalize")
             return LBF_VECTOR_NORMALIZE;
+        if (builtin.method == "distance")
+            return LBF_VECTOR_DISTANCE;
         if (builtin.method == "cross")
             return LBF_VECTOR_CROSS;
         if (builtin.method == "dot")
@@ -255,6 +261,22 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
             return LBF_VECTOR_MAX;
         if (FFlag::LuauCompileVectorLerp && builtin.method == "lerp")
             return LBF_VECTOR_LERP;
+    }
+
+    if (builtin.object == "quaternion")
+    {
+        if (builtin.method == "pack")
+            return LBF_QUATERNION_PACK;
+        if (builtin.method == "unpack")
+            return LBF_QUATERNION_UNPACK;
+        if (builtin.method == "conjugate")
+            return LBF_QUATERNION_CONJUGATE;
+        if (builtin.method == "angleaxis")
+            return LBF_QUATERNION_ANGLEAXIS;
+        if (builtin.method == "toangleaxis")
+            return LBF_QUATERNION_TOANGLEAXIS;
+        if (builtin.method == "direction")
+            return LBF_QUATERNION_DIRECTION;
     }
 
     if (options.vectorCtor)
@@ -558,6 +580,26 @@ BuiltinInfo getBuiltinInfo(int bfid)
         return {-1, 1}; // variadic
     case LBF_VECTOR_LERP:
         return {3, 1, BuiltinInfo::Flag_NoneSafe};
+
+    case LBF_VECTOR_PACK:
+        return {-1, 1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_VECTOR_UNPACK:
+        return {1, -1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_VECTOR_DISTANCE:
+        return {2, 1, BuiltinInfo::Flag_NoneSafe};
+
+    case LBF_QUATERNION_PACK:
+        return {-1, 1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_QUATERNION_UNPACK:
+        return {1, -1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_QUATERNION_CONJUGATE:
+        return {1, 1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_QUATERNION_ANGLEAXIS:
+        return {4, 1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_QUATERNION_TOANGLEAXIS:
+        return {1, -1, BuiltinInfo::Flag_NoneSafe};
+    case LBF_QUATERNION_DIRECTION:
+        return {1, 1, BuiltinInfo::Flag_NoneSafe};
 
     case LBF_MATH_LERP:
         return {3, 1, BuiltinInfo::Flag_NoneSafe};

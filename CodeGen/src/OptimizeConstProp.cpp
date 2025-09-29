@@ -649,6 +649,15 @@ static void handleBuiltinEffects(ConstPropState& state, LuauBuiltinFunction bfid
     case LBF_VECTOR_MAX:
     case LBF_VECTOR_LERP:
     case LBF_MATH_LERP:
+    case LBF_VECTOR_PACK:
+    case LBF_VECTOR_UNPACK:
+    case LBF_VECTOR_DISTANCE:
+    case LBF_QUATERNION_PACK:
+    case LBF_QUATERNION_UNPACK:
+    case LBF_QUATERNION_CONJUGATE:
+    case LBF_QUATERNION_ANGLEAXIS:
+    case LBF_QUATERNION_TOANGLEAXIS:
+    case LBF_QUATERNION_DIRECTION:
         break;
     case LBF_TABLE_INSERT:
         state.invalidateHeap();

@@ -25,6 +25,7 @@ struct BuiltinAstTypes
     AstTypeReference numberType{{}, std::nullopt, AstName{"number"}, std::nullopt, {}};
     AstTypeReference stringType{{}, std::nullopt, AstName{"string"}, std::nullopt, {}};
     AstTypeReference vectorType{{}, std::nullopt, AstName{"vector"}, std::nullopt, {}};
+    AstTypeReference quaternionType{{}, std::nullopt, AstName{"quaternion"}, std::nullopt, {}};
 
     AstTypeReference hostVectorType;
 };

@@ -432,16 +432,15 @@ void registerBuiltinGlobals(Frontend& frontend, GlobalTypes& globals, bool typeC
         quaternionCls->metatable = arena.addType(TableType{{}, std::nullopt, TypeLevel{}, TableState::Sealed});
         TableType* metatableTy = Luau::getMutable<TableType>(quaternionCls->metatable);
 
-        // Get vector type for quaternion * vector operations
-        TypeId vectorTy = builtinTypes->unknownType; // fallback
+        TypeId vectorTy = builtinTypes->unknownType;
         if (auto vectorIt = globals.globalScope->exportedTypeBindings.find("vector"); vectorIt != globals.globalScope->exportedTypeBindings.end())
         {
             vectorTy = vectorIt->second.type;
         }
 
         std::initializer_list<TypeId> mulOverloads{
-            makeFunction(arena, quaternionTy, {quaternionTy}, {quaternionTy}), // quaternion * quaternion -> quaternion
-            makeFunction(arena, quaternionTy, {vectorTy}, {vectorTy}),         // quaternion * vector -> vector
+            makeFunction(arena, quaternionTy, {quaternionTy}, {quaternionTy}),
+            makeFunction(arena, quaternionTy, {vectorTy}, {vectorTy}),
         };
         metatableTy->props["__mul"] = {makeIntersection(arena, mulOverloads)};
     }

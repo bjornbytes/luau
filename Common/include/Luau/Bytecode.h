@@ -640,6 +640,19 @@ enum LuauBuiltinFunction
     LBF_MATH_LERP,
 
     LBF_VECTOR_LERP,
+
+    // vector.pack, vector.unpack, vector.distance
+    LBF_VECTOR_PACK,
+    LBF_VECTOR_UNPACK,
+    LBF_VECTOR_DISTANCE,
+
+    // quaternion.
+    LBF_QUATERNION_PACK,
+    LBF_QUATERNION_UNPACK,
+    LBF_QUATERNION_CONJUGATE,
+    LBF_QUATERNION_ANGLEAXIS,
+    LBF_QUATERNION_TOANGLEAXIS,
+    LBF_QUATERNION_DIRECTION,
 };
 
 // Capture type, used in LOP_CAPTURE

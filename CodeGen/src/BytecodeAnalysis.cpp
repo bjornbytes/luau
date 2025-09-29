@@ -556,6 +556,49 @@ static void applyBuiltinCall(LuauBuiltinFunction bfid, BytecodeTypes& types)
         types.b = LBC_TYPE_VECTOR;
         types.c = LBC_TYPE_NUMBER;
         break;
+    case LBF_VECTOR_PACK:
+        types.result = LBC_TYPE_VECTOR;
+        types.a = LBC_TYPE_NUMBER;
+        types.b = LBC_TYPE_NUMBER;
+        types.c = LBC_TYPE_NUMBER;
+        break;
+    case LBF_VECTOR_UNPACK:
+        types.result = LBC_TYPE_NUMBER;
+        types.a = LBC_TYPE_VECTOR;
+        break;
+    case LBF_VECTOR_DISTANCE:
+        types.result = LBC_TYPE_NUMBER;
+        types.a = LBC_TYPE_VECTOR;
+        types.b = LBC_TYPE_VECTOR;
+        break;
+    case LBF_QUATERNION_PACK:
+        types.result = LBC_TYPE_QUATERNION;
+        types.a = LBC_TYPE_NUMBER;
+        types.b = LBC_TYPE_NUMBER;
+        types.c = LBC_TYPE_NUMBER;
+        break;
+    case LBF_QUATERNION_UNPACK:
+        types.result = LBC_TYPE_NUMBER;
+        types.a = LBC_TYPE_QUATERNION;
+        break;
+    case LBF_QUATERNION_CONJUGATE:
+        types.result = LBC_TYPE_QUATERNION;
+        types.a = LBC_TYPE_QUATERNION;
+        break;
+    case LBF_QUATERNION_ANGLEAXIS:
+        types.result = LBC_TYPE_QUATERNION;
+        types.a = LBC_TYPE_NUMBER;
+        types.b = LBC_TYPE_NUMBER;
+        types.c = LBC_TYPE_NUMBER;
+        break;
+    case LBF_QUATERNION_TOANGLEAXIS:
+        types.result = LBC_TYPE_NUMBER;
+        types.a = LBC_TYPE_QUATERNION;
+        break;
+    case LBF_QUATERNION_DIRECTION:
+        types.result = LBC_TYPE_VECTOR;
+        types.a = LBC_TYPE_QUATERNION;
+        break;
     case LBF_MATH_LERP:
         types.result = LBC_TYPE_NUMBER;
         types.a = LBC_TYPE_NUMBER;

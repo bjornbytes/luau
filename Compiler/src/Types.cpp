@@ -776,6 +776,33 @@ struct TypeMapVisitor : AstVisitor
             case LBF_VECTOR_LERP:
                 recordResolvedType(node, &builtinTypes.vectorType);
                 break;
+            case LBF_VECTOR_PACK:
+                recordResolvedType(node, &builtinTypes.vectorType);
+                break;
+            case LBF_VECTOR_UNPACK:
+                recordResolvedType(node, &builtinTypes.numberType);
+                break;
+            case LBF_VECTOR_DISTANCE:
+                recordResolvedType(node, &builtinTypes.numberType);
+                break;
+            case LBF_QUATERNION_PACK:
+                recordResolvedType(node, &builtinTypes.quaternionType);
+                break;
+            case LBF_QUATERNION_UNPACK:
+                recordResolvedType(node, &builtinTypes.numberType);
+                break;
+            case LBF_QUATERNION_CONJUGATE:
+                recordResolvedType(node, &builtinTypes.quaternionType);
+                break;
+            case LBF_QUATERNION_ANGLEAXIS:
+                recordResolvedType(node, &builtinTypes.quaternionType);
+                break;
+            case LBF_QUATERNION_TOANGLEAXIS:
+                recordResolvedType(node, &builtinTypes.numberType);
+                break;
+            case LBF_QUATERNION_DIRECTION:
+                recordResolvedType(node, &builtinTypes.vectorType);
+                break;
             }
         }
 
