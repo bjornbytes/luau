@@ -423,6 +423,29 @@ void registerBuiltinGlobals(Frontend& frontend, GlobalTypes& globals, bool typeC
         metatableTy->props["__idiv"] = {makeIntersection(arena, mulOverloads)};
     }
 
+    // Setup 'quaternion' metatable
+    if (auto it = globals.globalScope->exportedTypeBindings.find("quaternion"); it != globals.globalScope->exportedTypeBindings.end())
+    {
+        TypeId quaternionTy = it->second.type;
+        ExternType* quaternionCls = getMutable<ExternType>(quaternionTy);
+
+        quaternionCls->metatable = arena.addType(TableType{{}, std::nullopt, TypeLevel{}, TableState::Sealed});
+        TableType* metatableTy = Luau::getMutable<TableType>(quaternionCls->metatable);
+
+        // Get vector type for quaternion * vector operations
+        TypeId vectorTy = builtinTypes->unknownType; // fallback
+        if (auto vectorIt = globals.globalScope->exportedTypeBindings.find("vector"); vectorIt != globals.globalScope->exportedTypeBindings.end())
+        {
+            vectorTy = vectorIt->second.type;
+        }
+
+        std::initializer_list<TypeId> mulOverloads{
+            makeFunction(arena, quaternionTy, {quaternionTy}, {quaternionTy}), // quaternion * quaternion -> quaternion
+            makeFunction(arena, quaternionTy, {vectorTy}, {vectorTy}),         // quaternion * vector -> vector
+        };
+        metatableTy->props["__mul"] = {makeIntersection(arena, mulOverloads)};
+    }
+
     // next<K, V>(t: Table<K, V>, i: K?) -> (K?, V)
     TypePackId nextArgsTypePack = arena.addTypePack(TypePack{{mapOfKtoV, makeOption(builtinTypes, arena, genericK)}});
     TypePackId nextRetsTypePack = arena.addTypePack(TypePack{{makeOption(builtinTypes, arena, genericK), genericV}});

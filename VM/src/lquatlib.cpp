@@ -5,6 +5,7 @@
 #include "lnumutils.h"
 
 #include <math.h>
+#include <cstring>
 
 #undef PI
 #define PI (3.14159265358979323846)
@@ -349,6 +350,70 @@ static int quaternion_call(lua_State* L)
     }
 }
 
+static int quaternion_index(lua_State* L)
+{
+    const short* q = luaL_checkquaternion(L, 1);
+    size_t namelen = 0;
+    const char* name = luaL_checklstring(L, 2, &namelen);
+
+    // field access implementation mirrors the fast-path we have in the VM
+    if (namelen == 1)
+    {
+        int ic = (name[0] | ' ') - 'x';
+
+        // 'w' is before 'x' in ascii, so ic is -1 when indexing with 'w'
+        if (ic == -1)
+            ic = 3;
+
+        if (unsigned(ic) < 4)
+        {
+            lua_pushnumber(L, luaui_maxf(q[ic] / 32767.f, -1.f));
+            return 1;
+        }
+    }
+
+    // fall back to quaternion library functions stored in metatable
+    lua_getmetatable(L, 1);
+    lua_getfield(L, -1, name);
+    if (!lua_isnil(L, -1))
+    {
+        return 1;
+    }
+
+    luaL_error(L, "attempt to index quaternion with '%s'", name);
+}
+
+static int quaternion_namecall(lua_State* L)
+{
+    if (const char* str = lua_namecallatom(L, nullptr))
+    {
+        if (strcmp(str, "pack") == 0)
+            return quaternion_pack(L);
+        if (strcmp(str, "unpack") == 0)
+            return quaternion_unpack(L);
+        if (strcmp(str, "conjugate") == 0)
+            return quaternion_conjugate(L);
+        if (strcmp(str, "angleaxis") == 0)
+            return quaternion_angleaxis(L);
+        if (strcmp(str, "toangleaxis") == 0)
+            return quaternion_toangleaxis(L);
+        if (strcmp(str, "euler") == 0)
+            return quaternion_euler(L);
+        if (strcmp(str, "toeuler") == 0)
+            return quaternion_toeuler(L);
+        if (strcmp(str, "between") == 0)
+            return quaternion_between(L);
+        if (strcmp(str, "lookdir") == 0)
+            return quaternion_lookdir(L);
+        if (strcmp(str, "direction") == 0)
+            return quaternion_direction(L);
+        if (strcmp(str, "slerp") == 0)
+            return quaternion_slerp(L);
+    }
+
+    luaL_error(L, "%s is not a valid method of quaternion", luaL_checkstring(L, 1));
+}
+
 static const luaL_Reg quaternionlib[] = {
     {"pack", quaternion_pack},
     {"unpack", quaternion_unpack},
@@ -385,8 +450,11 @@ int luaopen_quaternion(lua_State* L)
     lua_newtable(L);
     luaL_register(L, NULL, quaternionlib);
 
-    lua_pushvalue(L, -1); // mt.__index = mt
+    lua_pushcfunction(L, quaternion_index);
     lua_setfield(L, -2, "__index");
+
+    lua_pushcfunction(L, quaternion_namecall);
+    lua_setfield(L, -2, "__namecall");
 
     lua_setmetatable(L, -2); // set metatable
     lua_pop(L, 1); // pop dummy quaternion

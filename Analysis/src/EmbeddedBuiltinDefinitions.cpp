@@ -327,8 +327,12 @@ end
 
 declare vector: {
     create: @checked (x: number, y: number, z: number?) -> vector,
+    pack: @checked (x: number?, y: number?, z: number?) -> vector,
+    unpack: @checked (vec: vector) -> (number, number, number),
+    length: @checked (vec: vector) -> number,
     magnitude: @checked (vec: vector) -> number,
     normalize: @checked (vec: vector) -> vector,
+    distance: @checked (vec1: vector, vec2: vector) -> number,
     cross: @checked (vec1: vector, vec2: vector) -> vector,
     dot: @checked (vec1: vector, vec2: vector) -> number,
     angle: @checked (vec1: vector, vec2: vector, axis: vector?) -> number,
@@ -337,12 +341,20 @@ declare vector: {
     abs: @checked (vec: vector) -> vector,
     sign: @checked (vec: vector) -> vector,
     clamp: @checked (vec: vector, min: vector, max: vector) -> vector,
-    max: @checked (vector, ...vector) -> vector,
     min: @checked (vector, ...vector) -> vector,
-    lerp: @checked (vec1: vector, vec2: vector, t: number) -> number,
+    max: @checked (vector, ...vector) -> vector,
+    lerp: @checked (vec1: vector, vec2: vector, t: number) -> vector,
+    rotate: @checked (vec: vector, quat: quaternion) -> vector,
 
     zero: vector,
     one: vector,
+    left: vector,
+    right: vector,
+    up: vector,
+    down: vector,
+    forward: vector,
+    back: vector,
+    backward: vector,
 }
 
 )BUILTIN_SRC";
@@ -358,8 +370,12 @@ end
 
 declare vector: {
     create: @checked (x: number, y: number, z: number?) -> vector,
+    pack: @checked (x: number?, y: number?, z: number?) -> vector,
+    unpack: @checked (vec: vector) -> (number, number, number),
+    length: @checked (vec: vector) -> number,
     magnitude: @checked (vec: vector) -> number,
     normalize: @checked (vec: vector) -> vector,
+    distance: @checked (vec1: vector, vec2: vector) -> number,
     cross: @checked (vec1: vector, vec2: vector) -> vector,
     dot: @checked (vec1: vector, vec2: vector) -> number,
     angle: @checked (vec1: vector, vec2: vector, axis: vector?) -> number,
@@ -368,14 +384,51 @@ declare vector: {
     abs: @checked (vec: vector) -> vector,
     sign: @checked (vec: vector) -> vector,
     clamp: @checked (vec: vector, min: vector, max: vector) -> vector,
-    max: @checked (vector, ...vector) -> vector,
     min: @checked (vector, ...vector) -> vector,
+    max: @checked (vector, ...vector) -> vector,
+    lerp: @checked (vec1: vector, vec2: vector, t: number) -> vector,
+    rotate: @checked (vec: vector, quat: quaternion) -> vector,
 
     zero: vector,
     one: vector,
+    left: vector,
+    right: vector,
+    up: vector,
+    down: vector,
+    forward: vector,
+    back: vector,
+    backward: vector,
 }
 
 )BUILTIN_SRC";
+
+static const char* const kBuiltinDefinitionQuaternionSrc = R"BUILTIN_SRC(
+
+declare extern type quaternion with
+    x: number
+    y: number
+    z: number
+    w: number
+end
+
+declare quaternion: {
+    pack: @checked (x: number?, y: number?, z: number?, w: number?) -> quaternion,
+    unpack: @checked (quat: quaternion) -> (number, number, number, number),
+    conjugate: @checked (quat: quaternion) -> quaternion,
+    angleaxis: @checked (angle: number, x: number, y: number, z: number) -> quaternion,
+    toangleaxis: @checked (quat: quaternion) -> (number, number, number, number),
+    euler: @checked (x: number, y: number, z: number) -> quaternion,
+    toeuler: @checked (quat: quaternion) -> (number, number, number),
+    between: @checked (v1: vector, v2: vector) -> quaternion,
+    lookdir: @checked (forward: vector, up: vector?) -> quaternion,
+    direction: @checked (quat: quaternion) -> vector,
+    slerp: @checked (q1: quaternion, q2: quaternion, t: number) -> quaternion,
+
+    identity: quaternion,
+}
+
+)BUILTIN_SRC";
+
 
 std::string getBuiltinDefinitionSource()
 {
@@ -397,6 +450,8 @@ std::string getBuiltinDefinitionSource()
     {
         result += kBuiltinDefinitionVectorSrc_DEPRECATED;
     }
+
+    result += kBuiltinDefinitionQuaternionSrc;
 
     return result;
 }

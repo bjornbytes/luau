@@ -1813,6 +1813,15 @@ void BytecodeBuilder::dumpConstant(std::string& result, int k) const
         else
             formatAppend(result, "%.9g, %.9g, %.9g, %.9g", data.valueVector[0], data.valueVector[1], data.valueVector[2], data.valueVector[3]);
         break;
+    case Constant::Type_Quaternion:
+    {
+        float x = std::max(data.valueQuaternion[0] / 32767.f, -1.f);
+        float y = std::max(data.valueQuaternion[1] / 32767.f, -1.f);
+        float z = std::max(data.valueQuaternion[2] / 32767.f, -1.f);
+        float w = std::max(data.valueQuaternion[3] / 32767.f, -1.f);
+        formatAppend(result, "%.9g, %.9g, %.9g, %.9g", x, y, z, w);
+        break;
+    }
     case Constant::Type_String:
     {
         const StringRef& str = debugStrings[data.valueString - 1];

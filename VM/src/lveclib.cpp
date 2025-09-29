@@ -5,8 +5,29 @@
 #include "lnumutils.h"
 
 #include <math.h>
+#include <cstring>
 
 LUAU_FASTFLAGVARIABLE(LuauVectorLerp)
+
+static int vector_create(lua_State* L)
+{
+    // checking argument count to avoid accepting 'nil' as a valid value
+    int count = lua_gettop(L);
+
+    double x = luaL_checknumber(L, 1);
+    double y = luaL_checknumber(L, 2);
+    double z = count >= 3 ? luaL_checknumber(L, 3) : 0.0;
+
+#if LUA_VECTOR_SIZE == 4
+    double w = count >= 4 ? luaL_checknumber(L, 4) : 0.0;
+
+    lua_pushvector(L, float(x), float(y), float(z), float(w));
+#else
+    lua_pushvector(L, float(x), float(y), float(z));
+#endif
+
+    return 1;
+}
 
 static int vector_pack(lua_State* L)
 {
@@ -355,6 +376,88 @@ static int vector_rotate(lua_State* L)
     return 1;
 }
 
+static int vector_index(lua_State* L)
+{
+    const float* v = luaL_checkvector(L, 1);
+    size_t namelen = 0;
+    const char* name = luaL_checklstring(L, 2, &namelen);
+
+    // field access implementation mirrors the fast-path we have in the VM
+    if (namelen == 1)
+    {
+        int ic = (name[0] | ' ') - 'x';
+
+#if LUA_VECTOR_SIZE == 4
+        // 'w' is before 'x' in ascii, so ic is -1 when indexing with 'w'
+        if (ic == -1)
+            ic = 3;
+#endif
+
+        if (unsigned(ic) < LUA_VECTOR_SIZE)
+        {
+            lua_pushnumber(L, v[ic]);
+            return 1;
+        }
+    }
+
+    // fall back to vector library functions stored in metatable
+    lua_getmetatable(L, 1);
+    lua_getfield(L, -1, name);
+    if (!lua_isnil(L, -1))
+    {
+        return 1;
+    }
+
+    luaL_error(L, "attempt to index vector with '%s'", name);
+}
+
+static int vector_namecall(lua_State* L)
+{
+    if (const char* str = lua_namecallatom(L, nullptr))
+    {
+        if (strcmp(str, "create") == 0)
+            return vector_create(L);
+        if (strcmp(str, "pack") == 0)
+            return vector_pack(L);
+        if (strcmp(str, "unpack") == 0)
+            return vector_unpack(L);
+        if (strcmp(str, "length") == 0)
+            return vector_length(L);
+        if (strcmp(str, "magnitude") == 0)
+            return vector_length(L);
+        if (strcmp(str, "normalize") == 0)
+            return vector_normalize(L);
+        if (strcmp(str, "distance") == 0)
+            return vector_distance(L);
+        if (strcmp(str, "cross") == 0)
+            return vector_cross(L);
+        if (strcmp(str, "dot") == 0)
+            return vector_dot(L);
+        if (strcmp(str, "angle") == 0)
+            return vector_angle(L);
+        if (strcmp(str, "floor") == 0)
+            return vector_floor(L);
+        if (strcmp(str, "ceil") == 0)
+            return vector_ceil(L);
+        if (strcmp(str, "abs") == 0)
+            return vector_abs(L);
+        if (strcmp(str, "sign") == 0)
+            return vector_sign(L);
+        if (strcmp(str, "clamp") == 0)
+            return vector_clamp(L);
+        if (strcmp(str, "min") == 0)
+            return vector_min(L);
+        if (strcmp(str, "max") == 0)
+            return vector_max(L);
+        if (strcmp(str, "lerp") == 0)
+            return vector_lerp(L);
+        if (strcmp(str, "rotate") == 0)
+            return vector_rotate(L);
+    }
+
+    luaL_error(L, "%s is not a valid method of vector", luaL_checkstring(L, 1));
+}
+
 static int vector_call(lua_State* L)
 {
     lua_remove(L, 1);
@@ -362,10 +465,11 @@ static int vector_call(lua_State* L)
 }
 
 static const luaL_Reg vectorlib[] = {
+    {"create", vector_create},
     {"pack", vector_pack},
-    {"create", vector_pack},
     {"unpack", vector_unpack},
     {"length", vector_length},
+    {"magnitude", vector_length},
     {"normalize", vector_normalize},
     {"distance", vector_distance},
     {"cross", vector_cross},
@@ -445,8 +549,11 @@ int luaopen_vector(lua_State* L)
     lua_newtable(L);
     luaL_register(L, NULL, vectorlib);
 
-    lua_pushvalue(L, -1); // mt.__index = mt
+    lua_pushcfunction(L, vector_index);
     lua_setfield(L, -2, "__index");
+
+    lua_pushcfunction(L, vector_namecall);
+    lua_setfield(L, -2, "__namecall");
 
     lua_setmetatable(L, -2); // set metatable
     lua_pop(L, 1); // pop dummy vector
