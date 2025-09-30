@@ -227,6 +227,9 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
             return LBF_BUFFER_WRITEF64;
     }
 
+    if (builtin.isGlobal("vector"))
+        return LBF_VECTOR_PACK;
+
     if (builtin.object == "vector")
     {
         if (builtin.method == "create")
@@ -262,6 +265,9 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
         if (FFlag::LuauCompileVectorLerp && builtin.method == "lerp")
             return LBF_VECTOR_LERP;
     }
+
+    if (builtin.isGlobal("quaternion"))
+        return LBF_QUATERNION_ANGLEAXIS;
 
     if (builtin.object == "quaternion")
     {
