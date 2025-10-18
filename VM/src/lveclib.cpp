@@ -9,37 +9,20 @@
 
 LUAU_FASTFLAGVARIABLE(LuauVectorLerp)
 
-static int vector_create(lua_State* L)
+static int vector_pack(lua_State* L)
 {
-    // checking argument count to avoid accepting 'nil' as a valid value
     int count = lua_gettop(L);
 
     double x = luaL_checknumber(L, 1);
-    double y = luaL_checknumber(L, 2);
-    double z = count >= 3 ? luaL_checknumber(L, 3) : 0.0;
+    double y = luaL_optnumber(L, 2, x);
+    double z = luaL_optnumber(L, 3, count == 1 ? x : 0.0);
 
 #if LUA_VECTOR_SIZE == 4
-    double w = count >= 4 ? luaL_checknumber(L, 4) : 0.0;
+    double w = luaL_optnumber(L, 4, count == 1 ? x : 0.0);
 
     lua_pushvector(L, float(x), float(y), float(z), float(w));
 #else
     lua_pushvector(L, float(x), float(y), float(z));
-#endif
-
-    return 1;
-}
-
-static int vector_pack(lua_State* L)
-{
-    float x = float(luaL_optnumber(L, 1, 0.f));
-    float y = float(luaL_optnumber(L, 2, x));
-    float z = float(luaL_optnumber(L, 3, x));
-
-#if LUA_VECTOR_SIZE == 4
-    float w = float(luaL_optnumber(L, 4, x));
-    lua_pushvector(L, x, y, z, w);
-#else
-    lua_pushvector(L, x, y, z);
 #endif
 
     return 1;
@@ -416,7 +399,7 @@ static int vector_namecall(lua_State* L)
     if (const char* str = lua_namecallatom(L, nullptr))
     {
         if (strcmp(str, "create") == 0)
-            return vector_create(L);
+            return vector_pack(L);
         if (strcmp(str, "pack") == 0)
             return vector_pack(L);
         if (strcmp(str, "unpack") == 0)
@@ -465,7 +448,7 @@ static int vector_call(lua_State* L)
 }
 
 static const luaL_Reg vectorlib[] = {
-    {"create", vector_create},
+    {"create", vector_pack},
     {"pack", vector_pack},
     {"unpack", vector_unpack},
     {"length", vector_length},

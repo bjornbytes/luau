@@ -641,8 +641,7 @@ enum LuauBuiltinFunction
 
     LBF_VECTOR_LERP,
 
-    // vector.pack, vector.unpack, vector.distance
-    LBF_VECTOR_PACK,
+    // vector.unpack, vector.distance
     LBF_VECTOR_UNPACK,
     LBF_VECTOR_DISTANCE,
 

@@ -228,14 +228,14 @@ static int getBuiltinFunctionId(const Builtin& builtin, const CompileOptions& op
     }
 
     if (builtin.isGlobal("vector"))
-        return LBF_VECTOR_PACK;
+        return LBF_VECTOR;
 
     if (builtin.object == "vector")
     {
         if (builtin.method == "create")
             return LBF_VECTOR;
         if (builtin.method == "pack")
-            return LBF_VECTOR_PACK;
+            return LBF_VECTOR;
         if (builtin.method == "unpack")
             return LBF_VECTOR_UNPACK;
         if (builtin.method == "magnitude")
@@ -521,7 +521,7 @@ BuiltinInfo getBuiltinInfo(int bfid)
         return {-1, -1}; // 1, 2 or 3 parameters
 
     case LBF_VECTOR:
-        return {-1, 1}; // 3 or 4 parameters in some configurations
+        return {-1, 1, BuiltinInfo::Flag_NoneSafe}; // 1-4 parameters
 
     case LBF_BIT32_COUNTLZ:
     case LBF_BIT32_COUNTRZ:
@@ -587,8 +587,6 @@ BuiltinInfo getBuiltinInfo(int bfid)
     case LBF_VECTOR_LERP:
         return {3, 1, BuiltinInfo::Flag_NoneSafe};
 
-    case LBF_VECTOR_PACK:
-        return {-1, 1, BuiltinInfo::Flag_NoneSafe};
     case LBF_VECTOR_UNPACK:
         return {1, -1, BuiltinInfo::Flag_NoneSafe};
     case LBF_VECTOR_DISTANCE:

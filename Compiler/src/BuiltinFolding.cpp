@@ -44,6 +44,16 @@ static Constant cvector(double x, double y, double z, double w)
     return res;
 }
 
+static Constant cquaternion(double x, double y, double z, double w)
+{
+    Constant res = {Constant::Type_Quaternion};
+    res.valueQuaternion[0] = (short)(x * 32767.0);
+    res.valueQuaternion[1] = (short)(y * 32767.0);
+    res.valueQuaternion[2] = (short)(z * 32767.0);
+    res.valueQuaternion[3] = (short)(w * 32767.0);
+    return res;
+}
+
 static Constant cstring(const char* v)
 {
     Constant res = {Constant::Type_String};
@@ -500,15 +510,14 @@ Constant foldBuiltin(int bfid, const Constant* args, size_t count)
         break;
 
     case LBF_VECTOR:
-        if (count >= 2 && args[0].type == Constant::Type_Number && args[1].type == Constant::Type_Number)
-        {
-            if (count == 2)
-                return cvector(args[0].valueNumber, args[1].valueNumber, 0.0, 0.0);
-            else if (count == 3 && args[2].type == Constant::Type_Number)
-                return cvector(args[0].valueNumber, args[1].valueNumber, args[2].valueNumber, 0.0);
-            else if (count == 4 && args[2].type == Constant::Type_Number && args[3].type == Constant::Type_Number)
-                return cvector(args[0].valueNumber, args[1].valueNumber, args[2].valueNumber, args[3].valueNumber);
-        }
+        if (count == 1 && args[0].type == Constant::Type_Number)
+            return cvector(args[0].valueNumber, args[0].valueNumber, args[0].valueNumber, args[0].valueNumber);
+        else if (count == 2 && args[0].type == Constant::Type_Number && args[1].type == Constant::Type_Number)
+            return cvector(args[0].valueNumber, args[1].valueNumber, 0.0, 0.0);
+        else if (count == 3 && args[0].type == Constant::Type_Number && args[1].type == Constant::Type_Number && args[2].type == Constant::Type_Number)
+            return cvector(args[0].valueNumber, args[1].valueNumber, args[2].valueNumber, 0.0);
+        else if (count == 4 && args[0].type == Constant::Type_Number && args[1].type == Constant::Type_Number && args[2].type == Constant::Type_Number && args[3].type == Constant::Type_Number)
+            return cvector(args[0].valueNumber, args[1].valueNumber, args[2].valueNumber, args[3].valueNumber);
         break;
 
     case LBF_MATH_LERP:
@@ -521,6 +530,11 @@ Constant foldBuiltin(int bfid, const Constant* args, size_t count)
             double v = (t == 1.0) ? b : a + (b - a) * t;
             return cnum(v);
         }
+        break;
+
+    case LBF_QUATERNION_PACK:
+        if (count == 4 && args[0].type == Constant::Type_Number && args[1].type == Constant::Type_Number && args[2].type == Constant::Type_Number && args[3].type == Constant::Type_Number)
+            return cquaternion(args[0].valueNumber, args[1].valueNumber, args[2].valueNumber, args[3].valueNumber);
         break;
     }
 

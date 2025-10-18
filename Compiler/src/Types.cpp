@@ -776,9 +776,6 @@ struct TypeMapVisitor : AstVisitor
             case LBF_VECTOR_LERP:
                 recordResolvedType(node, &builtinTypes.vectorType);
                 break;
-            case LBF_VECTOR_PACK:
-                recordResolvedType(node, &builtinTypes.vectorType);
-                break;
             case LBF_VECTOR_UNPACK:
                 recordResolvedType(node, &builtinTypes.numberType);
                 break;

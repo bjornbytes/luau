@@ -123,9 +123,10 @@ public:
     static const int tboolean = 1;
     static const int tnumber = 3;
     static const int tvector = 4;
-    static const int tstring = 5;
-    static const int ttable = 6;
-    static const int tfunction = 7;
+    static const int tquaternion = 5;
+    static const int tstring = 6;
+    static const int ttable = 7;
+    static const int tfunction = 8;
 };
 
 TEST_SUITE_BEGIN("Optimization");

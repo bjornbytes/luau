@@ -794,10 +794,10 @@ void BytecodeBuilder::writeFunction(std::string& ss, uint32_t id, uint8_t flags)
 
         case Constant::Type_Quaternion:
             writeByte(ss, LBC_CONSTANT_QUATERNION);
-            writeFloat(ss, c.valueQuaternion[0]);
-            writeFloat(ss, c.valueQuaternion[1]);
-            writeFloat(ss, c.valueQuaternion[2]);
-            writeFloat(ss, c.valueQuaternion[3]);
+            writeFloat(ss, std::max(c.valueQuaternion[0] / 32767.0f, -1.0f));
+            writeFloat(ss, std::max(c.valueQuaternion[1] / 32767.0f, -1.0f));
+            writeFloat(ss, std::max(c.valueQuaternion[2] / 32767.0f, -1.0f));
+            writeFloat(ss, std::max(c.valueQuaternion[3] / 32767.0f, -1.0f));
             break;
 
         case Constant::Type_String:
