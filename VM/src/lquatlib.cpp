@@ -315,17 +315,19 @@ static int quaternion_slerp(lua_State* L)
 
     float halfTheta = acosf(dot);
     float sinHalfTheta = sqrtf(1.f - dot * dot);
+    float s = 1.f - t;
 
     if (fabsf(sinHalfTheta) < .001f) {
-      float x = qx * .5f + rx * .5f;
-      float y = qy * .5f + ry * .5f;
-      float z = qz * .5f + rz * .5f;
-      float w = qw * .5f + rw * .5f;
-      lua_pushquaternion(L, x, y, z, w);
+      float x = qx * s + rx * t;
+      float y = qy * s + ry * t;
+      float z = qz * s + rz * t;
+      float w = qw * s + rw * t;
+      float length = sqrtf(x * x + y * y + z * z + w * w);
+      lua_pushquaternion(L, x / length, y / length, z / length, w / length);
       return 1;
     }
 
-    float a = sinf((1.f - t) * halfTheta) / sinHalfTheta;
+    float a = sinf(s * halfTheta) / sinHalfTheta;
     float b = sinf(t * halfTheta) / sinHalfTheta;
 
     float x = qx * a + rx * b;
