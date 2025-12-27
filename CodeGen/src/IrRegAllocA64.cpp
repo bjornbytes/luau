@@ -11,6 +11,8 @@
 #include <string.h>
 
 LUAU_FASTFLAGVARIABLE(DebugCodegenChaosA64)
+LUAU_FASTFLAG(LuauCodegenChainedSpills)
+LUAU_FASTFLAGVARIABLE(LuauCodegenSpillRestoreFreeTemp)
 
 namespace Luau
 {
@@ -47,12 +49,16 @@ static void freeSpill(uint32_t& free, KindA64 kind, uint8_t slot)
     free |= mask;
 }
 
-static int getReloadOffset(IrCmd cmd)
+static int getReloadOffset_DEPRECATED(IrCmd cmd)
 {
+    CODEGEN_ASSERT(!FFlag::LuauCodegenChainedSpills);
+
     switch (getCmdValueKind(cmd))
     {
     case IrValueKind::Unknown:
     case IrValueKind::None:
+    case IrValueKind::Float:
+    case IrValueKind::Count:
         CODEGEN_ASSERT(!"Invalid operand restore value kind");
         break;
     case IrValueKind::Tag:
@@ -71,22 +77,76 @@ static int getReloadOffset(IrCmd cmd)
     LUAU_UNREACHABLE();
 }
 
-static AddressA64 getReloadAddress(const IrFunction& function, const IrInst& inst, bool limitToCurrentBlock)
+static AddressA64 getReloadAddress_DEPRECATED(const IrFunction& function, const IrInst& inst, bool limitToCurrentBlock)
 {
-    IrOp location = function.findRestoreOp(inst, limitToCurrentBlock);
+    CODEGEN_ASSERT(!FFlag::LuauCodegenChainedSpills);
+
+    IrOp location = function.findRestoreOp_DEPRECATED(inst, limitToCurrentBlock);
 
     if (location.kind == IrOpKind::VmReg)
-        return mem(rBase, vmRegOp(location) * sizeof(TValue) + getReloadOffset(inst.cmd));
+        return mem(rBase, vmRegOp(location) * sizeof(TValue) + getReloadOffset_DEPRECATED(inst.cmd));
 
     // loads are 4/8/16 bytes; we conservatively limit the offset to fit assuming a 4b index
     if (location.kind == IrOpKind::VmConst && vmConstOp(location) * sizeof(TValue) <= AddressA64::kMaxOffset * 4)
-        return mem(rConstants, vmConstOp(location) * sizeof(TValue) + getReloadOffset(inst.cmd));
+        return mem(rConstants, vmConstOp(location) * sizeof(TValue) + getReloadOffset_DEPRECATED(inst.cmd));
 
     return AddressA64(xzr); // dummy
 }
 
-static void restoreInst(AssemblyBuilderA64& build, uint32_t& freeSpillSlots, IrFunction& function, const IrRegAllocA64::Spill& s, RegisterA64 reg)
+static int getReloadOffset(IrValueKind kind)
 {
+    CODEGEN_ASSERT(FFlag::LuauCodegenChainedSpills);
+
+    switch (kind)
+    {
+    case IrValueKind::Unknown:
+    case IrValueKind::None:
+    case IrValueKind::Float:
+    case IrValueKind::Count:
+        CODEGEN_ASSERT(!"Invalid operand restore value kind");
+        break;
+    case IrValueKind::Tag:
+        return offsetof(TValue, tt);
+    case IrValueKind::Int:
+        return offsetof(TValue, value);
+    case IrValueKind::Pointer:
+        return offsetof(TValue, value.gc);
+    case IrValueKind::Double:
+        return offsetof(TValue, value.n);
+    case IrValueKind::Tvalue:
+        return 0;
+    }
+
+    CODEGEN_ASSERT(!"Invalid operand restore value kind");
+    LUAU_UNREACHABLE();
+}
+
+static AddressA64 getReloadAddress(ValueRestoreLocation location)
+{
+    CODEGEN_ASSERT(FFlag::LuauCodegenChainedSpills);
+
+    IrOp op = location.op;
+
+    if (op.kind == IrOpKind::VmReg)
+        return mem(rBase, vmRegOp(op) * sizeof(TValue) + getReloadOffset(location.kind));
+
+    // loads are 4/8/16 bytes; we conservatively limit the offset to fit assuming a 4b index
+    if (op.kind == IrOpKind::VmConst && vmConstOp(op) * sizeof(TValue) <= AddressA64::kMaxOffset * 4)
+        return mem(rConstants, vmConstOp(op) * sizeof(TValue) + getReloadOffset(location.kind));
+
+    return AddressA64(xzr); // dummy
+}
+
+static void restoreInst_DEPRECATED(
+    AssemblyBuilderA64& build,
+    uint32_t& freeSpillSlots,
+    IrFunction& function,
+    const IrRegAllocA64::Spill& s,
+    RegisterA64 reg
+)
+{
+    CODEGEN_ASSERT(!FFlag::LuauCodegenChainedSpills);
+
     IrInst& inst = function.instructions[s.inst];
     CODEGEN_ASSERT(inst.regA64 == noreg);
 
@@ -100,7 +160,7 @@ static void restoreInst(AssemblyBuilderA64& build, uint32_t& freeSpillSlots, IrF
     else
     {
         CODEGEN_ASSERT(!inst.spilled && inst.needsReload);
-        AddressA64 addr = getReloadAddress(function, function.instructions[s.inst], /*limitToCurrentBlock*/ false);
+        AddressA64 addr = getReloadAddress_DEPRECATED(function, function.instructions[s.inst], /*limitToCurrentBlock*/ false);
         CODEGEN_ASSERT(addr.base != xzr);
         build.ldr(reg, addr);
     }
@@ -284,6 +344,18 @@ void IrRegAllocA64::freeLastUseRegs(const IrInst& inst, uint32_t index)
     checkOp(inst.g);
 }
 
+void IrRegAllocA64::freeTemp(RegisterA64 reg)
+{
+    Set& set = getSet(reg.kind);
+
+    CODEGEN_ASSERT((set.base & (1u << reg.index)) != 0);
+    CODEGEN_ASSERT((set.free & (1u << reg.index)) == 0);
+    CODEGEN_ASSERT((set.temp & (1u << reg.index)) != 0);
+
+    set.free |= 1u << reg.index;
+    set.temp &= ~(1u << reg.index);
+}
+
 void IrRegAllocA64::freeTempRegs()
 {
     CODEGEN_ASSERT((gpr.free & gpr.temp) == 0);
@@ -374,7 +446,10 @@ void IrRegAllocA64::restore(size_t start)
             Spill s = spills[i]; // copy in case takeReg reallocates spills
             RegisterA64 reg = takeReg(s.origin, s.inst);
 
-            restoreInst(build, freeSpillSlots, function, s, reg);
+            if (FFlag::LuauCodegenChainedSpills)
+                restore(s, reg);
+            else
+                restoreInst_DEPRECATED(build, freeSpillSlots, function, s, reg);
         }
 
         spills.resize(start);
@@ -392,7 +467,10 @@ void IrRegAllocA64::restoreReg(IrInst& inst)
             Spill s = spills[i]; // copy in case allocReg reallocates spills
             RegisterA64 reg = allocReg(s.origin.kind, index);
 
-            restoreInst(build, freeSpillSlots, function, s, reg);
+            if (FFlag::LuauCodegenChainedSpills)
+                restore(s, reg);
+            else
+                restoreInst_DEPRECATED(build, freeSpillSlots, function, s, reg);
 
             spills[i] = spills.back();
             spills.pop_back();
@@ -401,6 +479,62 @@ void IrRegAllocA64::restoreReg(IrInst& inst)
     }
 
     CODEGEN_ASSERT(!"Expected to find a spill record");
+}
+
+void IrRegAllocA64::restore(const IrRegAllocA64::Spill& s, RegisterA64 reg)
+{
+    CODEGEN_ASSERT(FFlag::LuauCodegenChainedSpills);
+
+    IrInst& inst = function.instructions[s.inst];
+    CODEGEN_ASSERT(inst.regA64 == noreg);
+
+    if (s.slot >= 0)
+    {
+        build.ldr(reg, mem(sp, sSpillArea.data + s.slot * 8));
+
+        if (s.slot != kInvalidSpill)
+            freeSpill(freeSpillSlots, reg.kind, s.slot);
+    }
+    else
+    {
+        CODEGEN_ASSERT(!inst.spilled && inst.needsReload);
+
+        // When restoring the value, we allow cross-block restore because we have commited to the target location at spill time
+        ValueRestoreLocation restoreLocation = function.findRestoreLocation(inst, /*limitToCurrentBlock*/ false);
+
+        AddressA64 addr = getReloadAddress(restoreLocation);
+        CODEGEN_ASSERT(addr.base != xzr);
+
+        IrValueKind spillValueKind = getCmdValueKind(inst.cmd);
+
+        if (spillValueKind == IrValueKind::Int && restoreLocation.kind == IrValueKind::Double)
+        {
+            // Handle restore of an int/uint value from a location storing a double number
+            RegisterA64 temp = allocTemp(KindA64::d);
+            build.ldr(temp, addr);
+
+            if (restoreLocation.conversionCmd == IrCmd::INT_TO_NUM)
+                build.fcvtzs(reg, temp);
+            else if (restoreLocation.conversionCmd == IrCmd::UINT_TO_NUM)
+                build.fcvtzs(castReg(KindA64::x, reg), temp); // note: we don't use fcvtzu for consistency with C++ code
+            else
+                CODEGEN_ASSERT(!"re-materialization not supported for this conversion command");
+
+            if (FFlag::LuauCodegenSpillRestoreFreeTemp)
+            {
+                // Temporary might have taken a spot needed for other registers in spill restore process
+                freeTemp(temp);
+            }
+        }
+        else
+        {
+            build.ldr(reg, addr);
+        }
+    }
+
+    inst.spilled = false;
+    inst.needsReload = false;
+    inst.regA64 = reg;
 }
 
 void IrRegAllocA64::spill(Set& set, uint32_t index, uint32_t targetInstIdx)
@@ -416,8 +550,10 @@ void IrRegAllocA64::spill(Set& set, uint32_t index, uint32_t targetInstIdx)
     {
         // instead of spilling the register to never reload it, we assume the register is not needed anymore
     }
-    else if (getReloadAddress(function, def, /*limitToCurrentBlock*/ true).base != xzr)
+    else if (FFlag::LuauCodegenChainedSpills ? function.hasRestoreLocation(def, /*limitToCurrentBlock*/ true)
+                                             : getReloadAddress_DEPRECATED(function, def, /*limitToCurrentBlock*/ true).base != xzr)
     {
+        // when checking if value has a restore operation to spill it, we only allow it in the same block
         // instead of spilling the register to stack, we can reload it from VM stack/constants
         // we still need to record the spill for restore(start) to work
         Spill s = {targetInstIdx, def.regA64, -1};

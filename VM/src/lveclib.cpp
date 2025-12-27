@@ -7,8 +7,6 @@
 #include <math.h>
 #include <cstring>
 
-LUAU_FASTFLAGVARIABLE(LuauVectorLerp)
-
 static int vector_pack(lua_State* L)
 {
     int count = lua_gettop(L);

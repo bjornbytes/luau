@@ -32,7 +32,6 @@ const char* const luaT_typenames[] = {
 
 const char* const luaT_eventname[] = {
     // ORDER TM
-    
     "__index",
     "__newindex",
     "__mode",
@@ -43,7 +42,6 @@ const char* const luaT_eventname[] = {
 
     "__eq",
 
-    
     "__add",
     "__sub",
     "__mul",
@@ -53,7 +51,6 @@ const char* const luaT_eventname[] = {
     "__pow",
     "__unm",
 
-    
     "__lt",
     "__le",
     "__concat",

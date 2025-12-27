@@ -301,7 +301,6 @@ typedef struct Proto
 {
     CommonHeader;
 
-
     uint8_t nups; // number of upvalues
     uint8_t numparams;
     uint8_t is_vararg;
@@ -310,13 +309,11 @@ typedef struct Proto
 
     TValue* k;              // constants used by the function
     Instruction* code;      // function bytecode
-
     struct Proto** p;       // functions defined inside the function
     const Instruction* codeentry;
 
     void* execdata;
     uintptr_t exectarget;
-
 
     uint8_t* lineinfo;      // for each instruction, line number as a delta from baseline
     int* abslineinfo;       // baseline line info, one entry for each 1<<linegaplog2 instructions; allocated after lineinfo
@@ -332,7 +329,6 @@ typedef struct Proto
     void* userdata;
 
     GCObject* gclist;
-
 
     int sizecode;
     int sizep;
@@ -466,12 +462,11 @@ typedef struct LuaTable
 {
     CommonHeader;
 
-
     uint8_t tmcache;    // 1<<p means tagmethod(p) is not present
     uint8_t readonly;   // sandboxing feature to prohibit writes to table
     uint8_t safeenv;    // environment doesn't share globals with other scripts
     uint8_t lsizenode;  // log2 of size of `node' array
-    uint8_t nodemask8; // (1<<lsizenode)-1, truncated to 8 bits
+    uint8_t nodemask8;  // (1<<lsizenode)-1, truncated to 8 bits
 
     int sizearray; // size of `array' array
     union
@@ -479,7 +474,6 @@ typedef struct LuaTable
         int lastfree;  // any free position is before this position
         int aboundary; // negated 'boundary' of `array' array; iff aboundary < 0
     };
-
 
     struct LuaTable* metatable;
     TValue* array;  // array part
