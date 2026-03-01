@@ -2,9 +2,8 @@
 #include "Luau/Autocomplete.h"
 #include "Luau/AutocompleteTypes.h"
 #include "Luau/BuiltinDefinitions.h"
-#include "Luau/TypeInfer.h"
+#include "Luau/Common.h"
 #include "Luau/Type.h"
-#include "Luau/VisitType.h"
 #include "Luau/StringUtils.h"
 
 
@@ -21,8 +20,8 @@ LUAU_DYNAMIC_FASTINT(LuauSubtypingRecursionLimit)
 LUAU_FASTFLAG(LuauTraceTypesInNonstrictMode2)
 LUAU_FASTFLAG(LuauSetMetatableDoesNotTimeTravel)
 LUAU_FASTINT(LuauTypeInferRecursionLimit)
-LUAU_FASTFLAG(LuauDoNotSuggestGenericsInAnonFuncs)
-LUAU_FASTFLAG(LuauAutocompleteSingletonsInIndexer)
+LUAU_FASTFLAG(LuauAutocompleteFunctionCallArgTails2)
+LUAU_FASTFLAG(LuauACOnMTTWriteOnlyPropNoCrash)
 
 using namespace Luau;
 
@@ -4375,8 +4374,6 @@ foo(@1)
 
 TEST_CASE_FIXTURE(ACFixture, "anonymous_autofilled_generic_type_pack_vararg")
 {
-    ScopedFastFlag sff{FFlag::LuauDoNotSuggestGenericsInAnonFuncs, true};
-
     check(R"(
 local function foo<A>(a: (...A) -> number, ...: A)
 	return a(...)
@@ -4398,8 +4395,6 @@ foo(@1)
 
 TEST_CASE_FIXTURE(ACFixture, "anonymous_autofilled_generic_named_arg")
 {
-    ScopedFastFlag sff{FFlag::LuauDoNotSuggestGenericsInAnonFuncs, true};
-
     check(R"(
 local function foo<A>(f: (a: A) -> number, a: A)
 	return f(a)
@@ -4421,8 +4416,6 @@ foo(@1)
 
 TEST_CASE_FIXTURE(ACFixture, "anonymous_autofilled_generic_return_type")
 {
-    ScopedFastFlag sff{FFlag::LuauDoNotSuggestGenericsInAnonFuncs, true};
-
     check(R"(
 local function foo<A>(f: () -> A)
 	return f()
@@ -5009,8 +5002,6 @@ TEST_CASE_FIXTURE(ACBuiltinsFixture, "autocomplete_deprecated_braced_attribute")
 
 TEST_CASE_FIXTURE(ACFixture, "autocomplete_using_indexer_with_singleton_keys")
 {
-    ScopedFastFlag _{FFlag::LuauAutocompleteSingletonsInIndexer, true};
-
     check(R"(
         type List = "Val1" | "Val2" | "Val3"
         local Table: { [List]: boolean }
@@ -5022,5 +5013,66 @@ TEST_CASE_FIXTURE(ACFixture, "autocomplete_using_indexer_with_singleton_keys")
     CHECK_EQ(ac.entryMap.count("Val2"), 1);
     CHECK_EQ(ac.entryMap.count("Val3"), 1);
 }
+
+TEST_CASE_FIXTURE(ACFixture, "autocomplete_using_function_with_singleton_arg")
+{
+    ScopedFastFlag sff{FFlag::LuauAutocompleteFunctionCallArgTails2, true};
+
+    check(R"(
+        local function foo(...: "Val1") end
+        foo(@1)
+    )");
+
+    auto ac = autocomplete('1');
+    CHECK_EQ(ac.entryMap.count("\"Val1\""), 1);
+}
+
+TEST_CASE_FIXTURE(ACFixture, "autocomplete_using_function_with_singleton_union_arg")
+{
+    ScopedFastFlag sff{FFlag::LuauAutocompleteFunctionCallArgTails2, true};
+
+    check(R"(
+        local function foo(...: "Val1" | "Val2") end
+        foo(@1)
+    )");
+
+    auto ac = autocomplete('1');
+    CHECK_EQ(ac.entryMap.count("\"Val1\""), 1);
+    CHECK_EQ(ac.entryMap.count("\"Val2\""), 1);
+}
+
+TEST_CASE_FIXTURE(ACBuiltinsFixture, "autocomplete_metatable_fill_writeonly_prop_no_crash")
+{
+    // Due to how memory is allocated and cleaned up on the stack in noopt builds, this will not crash on certain platforms.
+    // This can crash in optimized builds, but the test is mostly here to exercise that the branch in question gets hit
+    ScopedFastFlag sffs[] = {
+        {FFlag::LuauACOnMTTWriteOnlyPropNoCrash, true},
+        {FFlag::LuauSolverV2, true},
+    };
+    check(R"(
+
+local t0 = { thing = 5 }
+
+type function evil(x)
+    local tbl = types.newtable(nil, nil, nil)
+    tbl:setwriteproperty(types.singleton("__index"), types.any)
+    return tbl
+end
+
+type BadMTType = evil<{ thing : number}>
+local function foo(t : BadMTType)
+        local t2 = setmetatable({}, t)
+        return t2
+end
+
+local x = foo(nil :: any)
+x.@1
+    )");
+
+    auto ac = autocomplete('1');
+    CHECK(ac.entryMap.empty());
+}
+
+
 
 TEST_SUITE_END();

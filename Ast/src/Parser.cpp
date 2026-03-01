@@ -19,10 +19,9 @@ LUAU_FASTINTVARIABLE(LuauParseErrorLimit, 100)
 // See docs/SyntaxChanges.md for an explanation.
 LUAU_FASTFLAGVARIABLE(LuauSolverV2)
 LUAU_DYNAMIC_FASTFLAGVARIABLE(DebugLuauReportReturnTypeVariadicWithTypeSuffix, false)
-LUAU_FASTFLAGVARIABLE(DebugLuauStringSingletonBasedOnQuotes)
-LUAU_FASTFLAGVARIABLE(LuauExplicitTypeExpressionInstantiation)
-LUAU_FASTFLAG(LuauStandaloneParseType)
+LUAU_FASTFLAGVARIABLE(LuauExplicitTypeInstantiationSyntax)
 LUAU_FASTFLAGVARIABLE(LuauCstStatDoWithStatsStart)
+LUAU_FASTFLAGVARIABLE(DesugaredArrayTypeReferenceIsEmpty)
 
 // Clip with DebugLuauReportReturnTypeVariadicWithTypeSuffix
 bool luau_telemetry_parsed_return_type_variadic_with_type_suffix = false;
@@ -244,14 +243,11 @@ ParseNodeResult<Node> Parser::runParse(const char* buffer, size_t bufferSize, As
         Node* expr = f(p);
         size_t lines = p.lexer.current().location.end.line + (bufferSize > 0 && buffer[bufferSize - 1] != '\n');
 
-        if (FFlag::LuauStandaloneParseType)
+        Lexeme eof = p.lexer.next();
+        if (eof.type != Lexeme::Eof)
         {
-            Lexeme eof = p.lexer.next();
-            if (eof.type != Lexeme::Eof)
-            {
-                expr = nullptr;
-                p.parseErrors.emplace_back(eof.location, "Expected end of file");
-            }
+            expr = nullptr;
+            p.parseErrors.emplace_back(eof.location, "Expected end of file");
         }
 
         return ParseNodeResult<Node>{
@@ -2190,8 +2186,17 @@ AstType* Parser::parseTableType(bool inDeclarationContext)
 
             // array-like table type: {T} desugars into {[number]: T}
             isArray = true;
-            AstType* index = allocator.alloc<AstTypeReference>(type->location, std::nullopt, nameNumber, std::nullopt, type->location);
-            indexer = allocator.alloc<AstTableIndexer>(AstTableIndexer{index, type, type->location, access, accessLocation});
+            if (FFlag::DesugaredArrayTypeReferenceIsEmpty)
+            {
+                Location nullTypeLocation = Location(start.begin, 0);
+                AstType* index = allocator.alloc<AstTypeReference>(nullTypeLocation, std::nullopt, nameNumber, std::nullopt, nullTypeLocation);
+                indexer = allocator.alloc<AstTableIndexer>(AstTableIndexer{index, type, type->location, access, accessLocation});
+            }
+            else
+            {
+                AstType* index = allocator.alloc<AstTypeReference>(type->location, std::nullopt, nameNumber, std::nullopt, type->location);
+                indexer = allocator.alloc<AstTableIndexer>(AstTableIndexer{index, type, type->location, access, accessLocation});
+            }
 
             break;
         }
@@ -3087,7 +3092,7 @@ AstExpr* Parser::parsePrimaryExpr(bool asStatement)
         {
             expr = parseFunctionArgs(expr, false);
         }
-        else if (FFlag::LuauExplicitTypeExpressionInstantiation && lexer.current().type == '<' && lexer.lookahead().type == '<')
+        else if (FFlag::LuauExplicitTypeInstantiationSyntax && lexer.current().type == '<' && lexer.lookahead().type == '<')
         {
             expr = parseExplicitTypeInstantiationExpr(start, *expr);
         }
@@ -3113,7 +3118,7 @@ AstExpr* Parser::parseMethodCall(Position start, AstExpr* expr)
     Name index = parseIndexName("method name", opPosition);
     AstExpr* func = allocator.alloc<AstExprIndexName>(Location(start, index.location.end), expr, index.name, index.location, opPosition, ':');
 
-    if (FFlag::LuauExplicitTypeExpressionInstantiation)
+    if (FFlag::LuauExplicitTypeInstantiationSyntax)
     {
         AstArray<AstTypeOrPack> typeArguments;
         CstTypeInstantiation* cstTypeArguments = options.storeCstData ? allocator.alloc<CstTypeInstantiation>() : nullptr;
@@ -3921,38 +3926,17 @@ AstExpr* Parser::parseString()
     Location location = lexer.current().location;
 
     AstExprConstantString::QuoteStyle style;
-    if (FFlag::DebugLuauStringSingletonBasedOnQuotes)
+    switch (lexer.current().type)
     {
-        switch (lexer.current().type)
-        {
-        case Lexeme::InterpStringSimple:
-            style = AstExprConstantString::QuotedSimple;
-            break;
-        case Lexeme::RawString:
-            style = AstExprConstantString::QuotedRaw;
-            break;
-        case Lexeme::QuotedString:
-            style = lexer.current().getQuoteStyle() == Lexeme::QuoteStyle::Single ? AstExprConstantString::QuotedSingle
-                                                                                  : AstExprConstantString::QuotedSimple;
-            break;
-        default:
-            LUAU_ASSERT(false && "Invalid string type");
-        }
-    }
-    else
-    {
-        switch (lexer.current().type)
-        {
-        case Lexeme::QuotedString:
-        case Lexeme::InterpStringSimple:
-            style = AstExprConstantString::QuotedSimple;
-            break;
-        case Lexeme::RawString:
-            style = AstExprConstantString::QuotedRaw;
-            break;
-        default:
-            LUAU_ASSERT(false && "Invalid string type");
-        }
+    case Lexeme::QuotedString:
+    case Lexeme::InterpStringSimple:
+        style = AstExprConstantString::QuotedSimple;
+        break;
+    case Lexeme::RawString:
+        style = AstExprConstantString::QuotedRaw;
+        break;
+    default:
+        LUAU_ASSERT(false && "Invalid string type");
     }
 
     CstExprConstantString::QuoteStyle fullStyle;
@@ -4061,8 +4045,7 @@ AstExpr* Parser::parseInterpString()
         {
             AstArray<AstArray<char>> stringsArray = copy(strings);
             AstArray<AstExpr*> exprs = copy(expressions);
-            AstExprInterpString* node =
-                allocator.alloc<AstExprInterpString>(Location{startLocation, lexer.previousLocation()}, stringsArray, exprs);
+            AstExprInterpString* node = allocator.alloc<AstExprInterpString>(Location{startLocation, lexer.previousLocation()}, stringsArray, exprs);
             if (options.storeCstData)
                 cstNodeMap[node] = allocator.alloc<CstExprInterpString>(copy(sourceStrings), copy(stringPositions));
             if (auto top = lexer.peekBraceStackTop())
@@ -4114,7 +4097,7 @@ LUAU_NOINLINE AstExpr* Parser::parseExplicitTypeInstantiationExpr(Position start
 
 AstArray<AstTypeOrPack> Parser::parseTypeInstantiationExpr(CstTypeInstantiation* cstNodeOut, Location* endLocationOut)
 {
-    LUAU_ASSERT(FFlag::LuauExplicitTypeExpressionInstantiation);
+    LUAU_ASSERT(FFlag::LuauExplicitTypeInstantiationSyntax);
 
     LUAU_ASSERT(lexer.current().type == '<' && lexer.lookahead().type == '<');
 

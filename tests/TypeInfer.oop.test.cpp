@@ -15,9 +15,7 @@
 
 using namespace Luau;
 
-LUAU_FASTFLAG(LuauHandleFunctionOversaturation)
-LUAU_FASTFLAG(LuauIndexInMetatableSubtyping)
-LUAU_FASTFLAG(LuauPushTypeConstraintLambdas2)
+LUAU_FASTFLAG(LuauPushTypeConstraintLambdas3)
 LUAU_FASTFLAG(LuauSolverV2)
 LUAU_FASTFLAG(LuauTrackFreeInteriorTypePacks)
 
@@ -174,8 +172,7 @@ TEST_CASE_FIXTURE(Fixture, "pass_too_many_arguments")
 {
     ScopedFastFlag sff[] = {
         {FFlag::LuauSolverV2, true},
-        {FFlag::LuauPushTypeConstraintLambdas2, true},
-        {FFlag::LuauHandleFunctionOversaturation, true},
+        {FFlag::LuauPushTypeConstraintLambdas3, true},
     };
 
     CheckResult result = check(R"(
@@ -681,8 +678,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "textbook_class_pattern_2")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "oop_invoke_with_inferred_self_type")
 {
-    ScopedFastFlag _{FFlag::LuauIndexInMetatableSubtyping, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local ItemContainer = {}
         ItemContainer.__index = ItemContainer
@@ -708,8 +703,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "oop_invoke_with_inferred_self_type")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "oop_invoke_with_inferred_self_and_property")
 {
-    ScopedFastFlag _{FFlag::LuauIndexInMetatableSubtyping, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local ItemContainer = {}
         ItemContainer.__index = ItemContainer
@@ -738,7 +731,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_allows_upcast")
 {
     ScopedFastFlag sffs[] = {
         {FFlag::LuauSolverV2, true},
-        {FFlag::LuauIndexInMetatableSubtyping, true},
     };
 
     LUAU_REQUIRE_NO_ERRORS(check(R"(
@@ -754,10 +746,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_allows_upcast")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_disallows_invalid_upcast")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauIndexInMetatableSubtyping, true},
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
 
     CheckResult results = check(R"(
         local Foobar = {}
@@ -778,10 +767,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_disallows_invalid_upcast")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_precedence_for_subtyping")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauIndexInMetatableSubtyping, true},
-    };
+    ScopedFastFlag _{FFlag::LuauSolverV2, true};
 
     CheckResult results = check(R"(
         local function foobar1(_: { read foo: number }) end
@@ -799,7 +785,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "metatable_field_precedence_for_subtyping")
     auto err = get<TypeMismatch>(results.errors[0]);
     REQUIRE(err);
     CHECK_EQ("{ read foo: string }", toString(err->wantedType, {/* exhaustive */ true}));
-    CHECK_EQ("{ @metatable { __index: { bar: boolean, foo: string } }, { foo: number } }", toString(err->givenType, { /* exhaustive */ true}));
+    CHECK_EQ("{ @metatable { __index: { bar: boolean, foo: string } }, { foo: number } }", toString(err->givenType, {/* exhaustive */ true}));
 }
 
 TEST_SUITE_END();

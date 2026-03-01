@@ -1,6 +1,7 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/AstQuery.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Common.h"
 #include "Luau/DenseHash.h"
 #include "Luau/Frontend.h"
 #include "Luau/Parser.h"
@@ -15,7 +16,6 @@
 using namespace Luau;
 
 LUAU_FASTFLAG(LuauSolverV2);
-LUAU_FASTFLAG(LuauStandaloneParseType)
 LUAU_FASTFLAG(DebugLuauFreezeArena)
 LUAU_FASTFLAG(DebugLuauMagicTypes)
 LUAU_FASTFLAG(LuauBetterTypeMismatchErrors)
@@ -1863,8 +1863,6 @@ TEST_CASE_FIXTURE(FrontendFixture, "parse_just_a_type")
 
 TEST_CASE_FIXTURE(FrontendFixture, "parse_types")
 {
-    ScopedFastFlag sff{FFlag::LuauStandaloneParseType, true};
-
     const TypeId ty1 = parseType("(number, boolean?) -> string");
     CHECK("(number, boolean?) -> string" == toString(ty1));
 
