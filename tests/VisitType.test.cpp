@@ -11,13 +11,13 @@
 using namespace Luau;
 
 LUAU_FASTINT(LuauVisitRecursionLimit);
-LUAU_FASTFLAG(LuauSolverV2)
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
 
 TEST_SUITE_BEGIN("VisitType");
 
 TEST_CASE_FIXTURE(Fixture, "throw_when_limit_is_exceeded")
 {
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
     {
         CheckResult result = check(R"(
             local t : {a: {b: {c: {d: {e: boolean}}}}}
@@ -63,7 +63,7 @@ TEST_CASE_FIXTURE(Fixture, "some_free_types_do_not_have_bounds")
 
 TEST_CASE_FIXTURE(Fixture, "some_free_types_have_bounds")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     Scope scope{getBuiltins()->anyTypePack};
     Type t{FreeType{&scope, getBuiltins()->neverType, getBuiltins()->numberType}};
@@ -143,6 +143,8 @@ TEST_CASE_FIXTURE(Fixture, "skip_over_tables")
 
 TEST_CASE_FIXTURE(Fixture, "detects_cycles")
 {
+    DOES_NOT_PASS_WITH_EXACT_TABLES();
+
     // Alas.  parseType() can't be used to create a cyclic type.
     // F where
     //     F = (T, number) -> number
@@ -191,6 +193,8 @@ TEST_CASE_FIXTURE(Fixture, "can_be_configured_not_to_skip_bound_types")
 
 TEST_CASE_FIXTURE(Fixture, "visitOnce")
 {
+    DOES_NOT_PASS_WITH_EXACT_TABLES();
+
     // An acyclic type that has redundant interior structure.
     // ({x: number}, {x: number}) -> {x: number}
 

@@ -8,12 +8,15 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <stdint.h>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+#include <stdint.h>
 
 namespace Luau
 {
@@ -43,12 +46,6 @@ class SharedCodeAllocator;
 class NativeModule
 {
 public:
-    NativeModule(
-        SharedCodeAllocator* allocator,
-        const std::optional<ModuleId>& moduleId,
-        const uint8_t* moduleBaseAddress,
-        std::vector<NativeProtoExecDataPtr> nativeProtos
-    ) noexcept;
     NativeModule(
         SharedCodeAllocator* allocator,
         const std::optional<ModuleId>& moduleId,
@@ -90,7 +87,6 @@ private:
 
     SharedCodeAllocator* allocator = nullptr;
     std::optional<ModuleId> moduleId = {};
-    const uint8_t* moduleBaseAddress_DEPRECATED = nullptr;
     CodeAllocationData codeAllocationData;
 
     std::vector<NativeProtoExecDataPtr> nativeProtos = {};

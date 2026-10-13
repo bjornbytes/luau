@@ -5,11 +5,13 @@
 
 #include "Fixture.h"
 
+#include "ScopedFlags.h"
 #include "doctest.h"
 
-LUAU_FASTFLAG(LuauSolverV2)
+LUAU_FASTFLAG(DebugLuauForceOldSolver)
 LUAU_FASTFLAG(DebugLuauMagicTypes)
-LUAU_FASTFLAG(LuauUnpackRespectsAnnotations)
+
+LUAU_FASTFLAG(LuauStrictVisitInstantiatedType)
 
 using namespace Luau;
 
@@ -79,7 +81,7 @@ TEST_CASE_FIXTURE(Fixture, "assignment_cannot_transform_a_table_property_type")
 
 TEST_CASE_FIXTURE(Fixture, "assignments_to_unannotated_parameters_can_transform_the_type")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         function f(x)
@@ -88,6 +90,8 @@ TEST_CASE_FIXTURE(Fixture, "assignments_to_unannotated_parameters_can_transform_
         end
     )");
 
+    ignoreMissingAnnotations(result);
+
     LUAU_REQUIRE_NO_ERRORS(result);
 
     CHECK("(unknown) -> number" == toString(requireType("f")));
@@ -95,7 +99,7 @@ TEST_CASE_FIXTURE(Fixture, "assignments_to_unannotated_parameters_can_transform_
 
 TEST_CASE_FIXTURE(Fixture, "assignments_to_annotated_parameters_are_checked")
 {
-    ScopedFastFlag sff{FFlag::LuauSolverV2, true};
+    ScopedFastFlag sff{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         function f(x: string)
@@ -103,6 +107,8 @@ TEST_CASE_FIXTURE(Fixture, "assignments_to_annotated_parameters_are_checked")
             return x
         end
     )");
+
+    ignoreMissingAnnotations(result);
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
     CHECK(Location{{2, 16}, {2, 17}} == result.errors[0].location);
@@ -146,6 +152,8 @@ TEST_CASE_FIXTURE(Fixture, "function_parameters_can_have_annotations")
         local four = double(2)
     )");
 
+    ignoreMissingAnnotations(result);
+
     LUAU_REQUIRE_NO_ERRORS(result);
 }
 
@@ -158,6 +166,8 @@ TEST_CASE_FIXTURE(Fixture, "function_parameter_annotations_are_checked")
 
         local four = double("two")
     )");
+
+    ignoreMissingAnnotations(result);
 
     LUAU_REQUIRE_ERROR_COUNT(1, result);
 }
@@ -241,6 +251,76 @@ TEST_CASE_FIXTURE(Fixture, "unknown_type_reference_generates_error")
     );
 }
 
+TEST_CASE_FIXTURE(Fixture, "unknown_generic_type_pack_reference_generates_one_error")
+{
+    ScopedFastFlag sff{FFlag::LuauStrictVisitInstantiatedType, true};
+
+    CheckResult result = check(R"(
+        --!strict
+        type F = (IDoNotExist...) -> ()
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+
+    const UnknownSymbol* error = get<UnknownSymbol>(result.errors[0]);
+    REQUIRE(error);
+    CHECK(error->name == "IDoNotExist");
+    CHECK(error->context == UnknownSymbol::Context::Type);
+}
+
+TEST_CASE_FIXTURE(Fixture, "unknown_generic_type_pack_vararg_generates_one_error")
+{
+    ScopedFastFlag sff{FFlag::LuauStrictVisitInstantiatedType, true};
+
+    CheckResult result = check(R"(
+        --!strict
+        function f(...: IDoNotExist...) end
+    )");
+
+    LUAU_REQUIRE_ERROR_COUNT(1, result);
+
+    const UnknownSymbol* error = get<UnknownSymbol>(result.errors[0]);
+    REQUIRE(error);
+    CHECK(error->name == "IDoNotExist");
+    CHECK(error->context == UnknownSymbol::Context::Type);
+}
+
+TEST_CASE_FIXTURE(Fixture, "unknown_generic_type_pack_in_explicit_instantiation_generates_one_error")
+{
+    ScopedFastFlag sff{FFlag::LuauStrictVisitInstantiatedType, true};
+
+    for (const char* source : {
+             R"(
+                --!strict
+                local function f<T...>() end
+                f<<IDoNotExist...>>()
+            )",
+             R"(
+                --!strict
+                local t = {}
+                function t:f<T...>() end
+                t:f<<IDoNotExist...>>()
+            )",
+             R"(
+                --!nonstrict
+                local t = {}
+                function t:f<T...>() end
+                t:f<<IDoNotExist...>>()
+            )",
+         })
+    {
+        CAPTURE(source);
+        CheckResult result = check(source);
+
+        LUAU_REQUIRE_ERROR_COUNT(1, result);
+
+        const UnknownSymbol* error = get<UnknownSymbol>(result.errors[0]);
+        REQUIRE(error);
+        CHECK(error->name == "IDoNotExist");
+        CHECK(error->context == UnknownSymbol::Context::Type);
+    }
+}
+
 TEST_CASE_FIXTURE(Fixture, "typeof_variable_type_annotation_should_return_its_type")
 {
     CheckResult result = check(R"(
@@ -264,7 +344,7 @@ TEST_CASE_FIXTURE(Fixture, "infer_type_of_value_a_via_typeof_with_assignment")
         a = "foo"
     )");
 
-    if (FFlag::LuauSolverV2)
+    if (!FFlag::DebugLuauForceOldSolver)
     {
         CHECK("string?" == toString(requireType("a")));
         CHECK("nil" == toString(requireType("b")));
@@ -381,6 +461,8 @@ TEST_CASE_FIXTURE(Fixture, "type_annotations_inside_function_bodies")
             return message
         end
     )");
+
+    ignoreMissingAnnotations(result);
 
     LUAU_REQUIRE_NO_ERRORS(result);
     dumpErrors(result);
@@ -544,6 +626,8 @@ TEST_CASE_FIXTURE(Fixture, "typeof_expr")
 
         local m: typeof(id(77))
     )");
+
+    ignoreMissingAnnotations(result);
 
     LUAU_REQUIRE_NO_ERRORS(result);
     CHECK_EQ("number", toString(requireType("m")));
@@ -802,7 +886,7 @@ TEST_CASE_FIXTURE(Fixture, "luau_ice_triggers_an_ice_exception_with_flag_handler
 
     bool caught = false;
 
-    getFrontend().iceHandler.onInternalError = [&](const char*)
+    getFrontend().onInternalError = [&](const char*)
     {
         caught = true;
     };
@@ -891,13 +975,15 @@ TEST_CASE_FIXTURE(Fixture, "instantiate_type_fun_should_not_trip_rbxassert")
 // Not important enough to fix today.
 TEST_CASE_FIXTURE(Fixture, "pulling_a_type_from_value_dont_falsely_create_occurs_check_failed")
 {
-    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         function f(x)
             type T = typeof(x)
         end
     )");
+
+    ignoreMissingAnnotations(result);
 
     LUAU_REQUIRE_NO_ERRORS(result);
 }
@@ -939,7 +1025,7 @@ TEST_CASE_FIXTURE(Fixture, "instantiation_clone_has_to_follow")
 
 TEST_CASE_FIXTURE(Fixture, "unifier3_supertail_covariant_with_sub")
 {
-    ScopedFastFlag _{FFlag::LuauSolverV2, true};
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     CheckResult result = check(R"(
         local function fib(n)
@@ -947,13 +1033,11 @@ TEST_CASE_FIXTURE(Fixture, "unifier3_supertail_covariant_with_sub")
         end
     )");
 
-    CHECK_EQ("<a>(a) -> t1 where t1 = add<a, t1>", toString(requireType("fib")));
+    CHECK_EQ("<T>(T) -> t1 where t1 = add<T, t1>", toString(requireType("fib")));
 }
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "respect_partially_annotated_type_packs_1")
 {
-    ScopedFastFlag _{FFlag::LuauUnpackRespectsAnnotations, true};
-
     CheckResult results = check(R"(
         local function f(): (number, string)
             return 42, "huh"
@@ -973,8 +1057,6 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "respect_partially_annotated_type_packs_1")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "respect_partially_annotated_type_packs_2")
 {
-    ScopedFastFlag _{FFlag::LuauUnpackRespectsAnnotations, true};
-
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         local function f(): (number, boolean, string)
             return 42, true, "huh"
@@ -988,10 +1070,7 @@ TEST_CASE_FIXTURE(BuiltinsFixture, "respect_partially_annotated_type_packs_2")
 
 TEST_CASE_FIXTURE(BuiltinsFixture, "react_use_state_partial_annotation")
 {
-    ScopedFastFlag sffs[] = {
-        {FFlag::LuauSolverV2, true},
-        {FFlag::LuauUnpackRespectsAnnotations, true},
-    };
+    ScopedFastFlag _{FFlag::DebugLuauForceOldSolver, false};
 
     LUAU_REQUIRE_NO_ERRORS(check(R"(
         type BasicStateAction<S> = ((S) -> S) | S

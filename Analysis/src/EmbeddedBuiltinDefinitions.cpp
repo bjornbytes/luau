@@ -1,13 +1,67 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "Luau/BuiltinDefinitions.h"
 
-LUAU_FASTFLAGVARIABLE(LuauTypeCheckerUdtfRenameClassToExtern)
-LUAU_FASTFLAGVARIABLE(LuauMorePermissiveNewtableType)
+LUAU_FASTFLAG(LuauIntegerLibrary)
+LUAU_FASTFLAG(LuauIntegerType2)
+LUAU_FASTFLAG(LuauAllowGlobalDeclarationToBeCalledClass)
+LUAU_FASTFLAG(DebugLuauExactTableTypes)
+LUAU_FASTFLAG(DebugLuauUserDefinedClasses)
+LUAU_FASTFLAGVARIABLE(LuauCoroutineFinallyAnalysis)
+LUAU_FASTFLAGVARIABLE(LuauRemoveLoadstringFromBuiltinDefinitions)
 
 namespace Luau
 {
 
 static constexpr const char* kBuiltinDefinitionBaseSrc = R"BUILTIN_SRC(
+
+@checked declare function require(target: any): any
+
+@checked declare function getfenv(target: any): { [string]: any }
+
+declare _G: any
+declare _VERSION: string
+
+declare function gcinfo(): number
+
+declare function print<T...>(...: T...)
+
+declare function type<T>(value: T): string
+declare function typeof<T>(value: T): string
+
+-- `assert` has a magic function attached that will give more detailed type information
+declare function assert<T>(value: T, errorMessage: string?): T
+declare function error<T>(message: T, level: number?): never
+
+declare function tostring<T>(value: T): string
+declare function tonumber<T>(value: T, radix: number?): number?
+
+declare function rawequal<T1, T2>(a: T1, b: T2): boolean
+declare function rawget<K, V>(tab: {[K]: V}, k: K): V?
+declare function rawset<K, V>(tab: {[K]: V}, k: K, v: V): {[K]: V}
+declare function rawlen<K, V>(obj: {[K]: V} | string): number
+
+declare function setfenv<T..., R...>(target: number | (T...) -> R..., env: {[string]: any}): ((T...) -> R...)?
+
+declare function ipairs<V>(tab: {V}): (({V}, number) -> (number?, V), {V}, number)
+
+declare function pcall<A..., R...>(f: (A...) -> R..., ...: A...): (boolean, R...)
+
+-- FIXME: The actual type of `xpcall` is:
+-- <E, A..., R1..., R2...>(f: (A...) -> R1..., err: (E) -> R2..., A...) -> (true, R1...) | (false, R2...)
+-- Since we can't represent the return value, we use (boolean, R1...).
+declare function xpcall<E, A..., R1..., R2...>(f: (A...) -> R1..., err: (E) -> R2..., ...: A...): (boolean, R1...)
+
+-- `select` has a magic function attached to provide more detailed type information
+declare function select<A...>(i: string | number, ...: A...): ...any
+
+@checked declare function newproxy(mt: boolean?): any
+
+-- Cannot use `typeof` here because it will produce a polytype when we expect a monotype.
+declare function unpack<V>(tab: {V}, i: number?, j: number?): ...V
+
+)BUILTIN_SRC";
+
+static constexpr const char* kBuiltinDefinitionBaseSrc_DEPRECATED = R"BUILTIN_SRC(
 
 @checked declare function require(target: any): any
 
@@ -119,6 +173,11 @@ declare math: {
 
     pi: number,
     huge: number,
+    nan: number,
+    e: number,
+    phi: number,
+    sqrt2: number,
+    tau: number,
 
     randomseed: @checked (seed: number) -> (),
     random: @checked (number?, number?) -> number,
@@ -170,7 +229,7 @@ declare os: {
 
 )BUILTIN_SRC";
 
-static constexpr const char* kBuiltinDefinitionCoroutineSrc = R"BUILTIN_SRC(
+static constexpr const char* kBuiltinDefinitionCoroutineSrc_DEPRECATED = R"BUILTIN_SRC(
 
 declare coroutine: {
     create: <A..., R...>(f: (A...) -> R...) -> thread,
@@ -181,6 +240,22 @@ declare coroutine: {
     yield: <A..., R...>(A...) -> R...,
     isyieldable: () -> boolean,
     close: @checked (co: thread) -> (boolean, any)
+}
+
+)BUILTIN_SRC";
+
+static constexpr const char* kBuiltinDefinitionCoroutineSrc = R"BUILTIN_SRC(
+
+declare coroutine: {
+    create: <A..., R...>(f: (A...) -> R...) -> thread,
+    resume: <A..., R...>(co: thread, A...) -> (boolean, R...),
+    running: () -> thread,
+    status: @checked (co: thread) -> "dead" | "running" | "normal" | "suspended",
+    wrap: <A..., R...>(f: (A...) -> R...) -> ((A...) -> R...),
+    yield: <A..., R...>(A...) -> R...,
+    isyieldable: () -> boolean,
+    close: @checked (co: thread) -> (boolean, any),
+    finally: (co: thread, callback: (status: "finished" | "error" | "cancelled", ...any) -> ()) -> ()
 }
 
 )BUILTIN_SRC";
@@ -207,6 +282,32 @@ declare table: {
 
     clear: (table: {}) -> (),
     isfrozen: (t: {}) -> boolean,
+}
+
+)BUILTIN_SRC";
+
+static constexpr const char* kBuiltinDefinitionTableSrc_EXACT_TABLES = R"BUILTIN_SRC(
+
+declare table: {
+    concat: <V>(t: {V, ...}, sep: string?, i: number?, j: number?) -> string,
+    insert: (<V>(t: {V, ...}, value: V) -> ()) & (<V>(t: {V, ...}, pos: number, value: V) -> ()),
+    maxn: <V>(t: {V, ...}) -> number,
+    remove: <V>(t: {V, ...}, number?) -> V?,
+    sort: <V>(t: {V, ...}, comp: ((V, V) -> boolean)?) -> (),
+    create: <V>(count: number, value: V?) -> {V},
+    find: <V>(haystack: {V, ...}, needle: V, init: number?) -> number?,
+
+    unpack: <V>(list: {V, ...}, i: number?, j: number?) -> ...V,
+    pack: <V>(...V) -> { n: number, [number]: V },
+
+    getn: <V>(t: {V, ...}) -> number,
+    foreach: <K, V>(t: {[K]: V, ...}, f: (K, V) -> ()) -> (),
+    foreachi: <V>({V, ...}, (number, V) -> ()) -> (),
+
+    move: <V>(src: {V, ...}, a: number, b: number, t: number, dst: {V, ...}?) -> {V, ...},
+
+    clear: (table: {...}) -> (),
+    isfrozen: (t: {...}) -> boolean,
 }
 
 )BUILTIN_SRC";
@@ -262,17 +363,107 @@ declare buffer: {
     writestring: @checked (b: buffer, offset: number, value: string, count: number?) -> (),
     readbits: @checked (b: buffer, bitOffset: number, bitCount: number) -> number,
     writebits: @checked (b: buffer, bitOffset: number, bitCount: number, value: number) -> (),
+    readinteger: @checked (b: buffer, offset: number) -> integer,
+    writeinteger: @checked (b: buffer, offset: number, value: integer) -> (),
 }
 
 )BUILTIN_SRC";
+
+static constexpr const char* kBuiltinDefinitionBufferSrc_NOINTEGER = R"BUILTIN_SRC(
+--- Buffer API
+declare buffer: {
+    create: @checked (size: number) -> buffer,
+    fromstring: @checked (str: string) -> buffer,
+    tostring: @checked (b: buffer) -> string,
+    len: @checked (b: buffer) -> number,
+    copy: @checked (target: buffer, targetOffset: number, source: buffer, sourceOffset: number?, count: number?) -> (),
+    fill: @checked (b: buffer, offset: number, value: number, count: number?) -> (),
+    readi8: @checked (b: buffer, offset: number) -> number,
+    readu8: @checked (b: buffer, offset: number) -> number,
+    readi16: @checked (b: buffer, offset: number) -> number,
+    readu16: @checked (b: buffer, offset: number) -> number,
+    readi32: @checked (b: buffer, offset: number) -> number,
+    readu32: @checked (b: buffer, offset: number) -> number,
+    readf32: @checked (b: buffer, offset: number) -> number,
+    readf64: @checked (b: buffer, offset: number) -> number,
+    writei8: @checked (b: buffer, offset: number, value: number) -> (),
+    writeu8: @checked (b: buffer, offset: number, value: number) -> (),
+    writei16: @checked (b: buffer, offset: number, value: number) -> (),
+    writeu16: @checked (b: buffer, offset: number, value: number) -> (),
+    writei32: @checked (b: buffer, offset: number, value: number) -> (),
+    writeu32: @checked (b: buffer, offset: number, value: number) -> (),
+    writef32: @checked (b: buffer, offset: number, value: number) -> (),
+    writef64: @checked (b: buffer, offset: number, value: number) -> (),
+    readstring: @checked (b: buffer, offset: number, count: number) -> string,
+    writestring: @checked (b: buffer, offset: number, value: string, count: number?) -> (),
+    readbits: @checked (b: buffer, bitOffset: number, bitCount: number) -> number,
+    writebits: @checked (b: buffer, bitOffset: number, bitCount: number, value: number) -> ()
+}
+
+)BUILTIN_SRC";
+
+static const char* const kBuiltinDefinitionIntegerSrc = R"BUILTIN_SRC(
+
+declare integer: {
+    create: @checked (x: number) -> integer,
+    tonumber: @checked (x: integer) -> number,
+    neg: @checked (value: integer) -> integer,
+    add: @checked (x: integer, y: integer) -> integer,
+    sub: @checked (x: integer, y: integer) -> integer,
+    mul: @checked (x: integer, y: integer) -> integer,
+    div: @checked (x: integer, y: integer) -> integer,
+    rem: @checked (x: integer, y: integer) -> integer,
+    idiv: @checked (x: integer, y: integer) -> integer,
+    mod: @checked (x: integer, y: integer) -> integer,
+    udiv: @checked (x: integer, y: integer) -> integer,
+    urem: @checked (x: integer, y: integer) -> integer,
+    min: @checked (integer, ...integer) -> integer,
+    max: @checked (integer, ...integer) -> integer,
+    band: @checked (...integer) -> integer,
+    bor: @checked (...integer) -> integer,
+    bnot: @checked (x: integer) -> integer,
+    bxor: @checked (...integer) -> integer,
+    lt: @checked (x: integer, y: integer) -> boolean,
+    le: @checked (x: integer, y: integer) -> boolean,
+    ult: @checked (x: integer, y: integer) -> boolean,
+    ule: @checked (x: integer, y: integer) -> boolean,
+    gt: @checked (x: integer, y: integer) -> boolean,
+    ge: @checked (x: integer, y: integer) -> boolean,
+    ugt: @checked (x: integer, y: integer) -> boolean,
+    uge: @checked (x: integer, y: integer) -> boolean,
+    lshift: @checked (x: integer, numBitPositions: integer) -> integer,
+    rshift: @checked (x: integer, numBitPositions: integer) -> integer,
+    arshift: @checked (x: integer, numBitPositions: integer) -> integer,
+    lrotate: @checked (x: integer, numBitPositions: integer) -> integer,
+    rrotate: @checked (x: integer, numBitPositions: integer) -> integer,
+    extract: @checked (value: integer, bitPosition: integer, numBits: integer?) -> integer,
+    replace: @checked (value: integer, replacement: integer, bitPosition: integer, numBits: integer?) -> integer,
+    clamp: @checked (value: integer, min: integer, max: integer) -> integer,
+    btest: @checked (...integer) -> boolean,
+    countrz: @checked (x: integer) -> integer,
+    countlz: @checked (x: integer) -> integer,
+    bswap: @checked (x: integer) -> integer,
+    fromstring: @checked (str: string, base: number?) -> integer,
+    minsigned: integer,
+    maxsigned: integer
+}
+
+)BUILTIN_SRC";
+
+static const char* kBuiltinDefinitionClassSrc = R"CLASS_SRC(
+declare class: {
+    isinstance: @checked (o: unknown, c: class) -> boolean,
+    classof: @checked (o: unknown) -> class?
+}
+)CLASS_SRC";
 
 static const char* const kBuiltinDefinitionVectorSrc = R"BUILTIN_SRC(
 
 -- While vector would have been better represented as a built-in primitive type, type solver extern type handling covers most of the properties
 declare extern type vector with
-    x: number
-    y: number
-    z: number
+    read x: number
+    read y: number
+    read z: number
 end
 
 declare vector: {
@@ -338,16 +529,38 @@ declare quaternion: {
 
 std::string getBuiltinDefinitionSource()
 {
-    std::string result = kBuiltinDefinitionBaseSrc;
+    std::string result = FFlag::LuauRemoveLoadstringFromBuiltinDefinitions ? kBuiltinDefinitionBaseSrc : kBuiltinDefinitionBaseSrc_DEPRECATED;
 
     result += kBuiltinDefinitionBit32Src;
     result += kBuiltinDefinitionMathSrc;
     result += kBuiltinDefinitionOsSrc;
-    result += kBuiltinDefinitionCoroutineSrc;
-    result += kBuiltinDefinitionTableSrc;
+
+    if (FFlag::LuauCoroutineFinallyAnalysis)
+        result += kBuiltinDefinitionCoroutineSrc;
+    else
+        result += kBuiltinDefinitionCoroutineSrc_DEPRECATED;
+
+    if (FFlag::DebugLuauExactTableTypes)
+        result += kBuiltinDefinitionTableSrc_EXACT_TABLES;
+    else
+        result += kBuiltinDefinitionTableSrc;
     result += kBuiltinDefinitionDebugSrc;
     result += kBuiltinDefinitionUtf8Src;
-    result += kBuiltinDefinitionBufferSrc;
+    if (FFlag::LuauIntegerType2 && FFlag::LuauIntegerLibrary)
+        result += kBuiltinDefinitionBufferSrc;
+    else
+        result += kBuiltinDefinitionBufferSrc_NOINTEGER;
+
+    if (FFlag::LuauIntegerType2 && FFlag::LuauIntegerLibrary)
+    {
+        result += kBuiltinDefinitionIntegerSrc;
+    }
+
+    if (FFlag::DebugLuauUserDefinedClasses && FFlag::LuauAllowGlobalDeclarationToBeCalledClass)
+    {
+        result += kBuiltinDefinitionClassSrc;
+    }
+
     result += kBuiltinDefinitionVectorSrc;
 
     result += kBuiltinDefinitionQuaternionSrc;
@@ -359,10 +572,11 @@ std::string getBuiltinDefinitionSource()
 static constexpr const char* kBuiltinDefinitionTypeMethodSrc = R"BUILTIN_SRC(
 
 export type type = {
-    tag: "nil" | "unknown" | "never" | "any" | "boolean" | "number" | "string" | "buffer" | "thread" |
+    tag: "nil" | "unknown" | "never" | "any" | "boolean" | "number" | "integer" | "string" | "buffer" | "thread" |
          "singleton" | "negation" | "union" | "intersection" | "table" | "function" | "extern" | "generic",
 
     is: (self: type, arg: string) -> boolean,
+    issubtypeof: (self: type, arg: type) -> boolean,
 
     -- for singleton type
     value: (self: type) -> (string | boolean | nil),
@@ -409,13 +623,14 @@ export type type = {
 
 )BUILTIN_SRC";
 
-static constexpr const char* kBuiltinDefinitionTypeMethodSrc_DEPRECATED = R"BUILTIN_SRC(
+static constexpr const char* kBuiltinDefinitionTypeMethodSrc_NOINTEGER = R"BUILTIN_SRC(
 
 export type type = {
     tag: "nil" | "unknown" | "never" | "any" | "boolean" | "number" | "string" | "buffer" | "thread" |
-         "singleton" | "negation" | "union" | "intersection" | "table" | "function" | "class" | "generic",
+         "singleton" | "negation" | "union" | "intersection" | "table" | "function" | "extern" | "generic",
 
     is: (self: type, arg: string) -> boolean,
+    issubtypeof: (self: type, arg: type) -> boolean,
 
     -- for singleton type
     value: (self: type) -> (string | boolean | nil),
@@ -473,6 +688,7 @@ declare types: {
     string: type,
     thread: type,
     buffer: type,
+    integer: type,
 
     singleton: @checked (arg: string | boolean | nil) -> type,
     optional: @checked (arg: type) -> type,
@@ -486,7 +702,7 @@ declare types: {
 }
 )BUILTIN_SRC";
 
-static constexpr const char* kBuiltinDefinitionTypesLibSrc_DEPRECATED = R"BUILTIN_SRC(
+static constexpr const char* kBuiltinDefinitionTypesLibSrc_NOINTEGER = R"BUILTIN_SRC(
 
 declare types: {
     unknown: type,
@@ -504,26 +720,25 @@ declare types: {
     negationof: @checked (arg: type) -> type,
     unionof: @checked (...type) -> type,
     intersectionof: @checked (...type) -> type,
-    newtable: @checked (props: {[type]: type} | {[type]: { read: type, write: type } } | nil, indexer: { index: type, readresult: type, writeresult: type }?, metatable: type?) -> type,
+    newtable: @checked (props: {[type]: type} | {[type]: { read: type?, write: type? } }?, indexer: { index: type, readresult: type, writeresult: type }?, metatable: type?) -> type,
     newfunction: @checked (parameters: { head: {type}?, tail: type? }?, returns: { head: {type}?, tail: type? }?, generics: {type}?) -> type,
     copy: @checked (arg: type) -> type,
 }
 )BUILTIN_SRC";
 
-
 std::string getTypeFunctionDefinitionSource()
 {
     std::string result;
 
-    if (FFlag::LuauTypeCheckerUdtfRenameClassToExtern)
+    if (FFlag::LuauIntegerType2)
         result += kBuiltinDefinitionTypeMethodSrc;
     else
-        result += kBuiltinDefinitionTypeMethodSrc_DEPRECATED;
+        result += kBuiltinDefinitionTypeMethodSrc_NOINTEGER;
 
-    if (FFlag::LuauMorePermissiveNewtableType)
+    if (FFlag::LuauIntegerType2)
         result += kBuiltinDefinitionTypesLibSrc;
     else
-        result += kBuiltinDefinitionTypesLibSrc_DEPRECATED;
+        result += kBuiltinDefinitionTypesLibSrc_NOINTEGER;
 
     return result;
 }

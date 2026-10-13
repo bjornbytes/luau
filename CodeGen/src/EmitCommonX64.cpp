@@ -14,8 +14,6 @@
 
 #include <utility>
 
-LUAU_DYNAMIC_FASTFLAGVARIABLE(AddReturnExectargetCheck, false)
-
 namespace Luau
 {
 namespace CodeGen
@@ -376,8 +374,8 @@ void emitInterrupt(AssemblyBuilderX64& build)
 
     // note: rbx is non-volatile so it will be saved across interrupt call automatically
 
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
+    RegisterX64 rArg1 = IrCallWrapperX64::suggestArgumentRegister<0>(SizeX64::qword, build);
+    RegisterX64 rArg2 = IrCallWrapperX64::suggestArgumentRegister<1>(SizeX64::qword, build);
 
     Label skip;
 
@@ -490,26 +488,18 @@ void emitReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers)
     // Registers alive: r9 (cip)
     RegisterX64 proto = rcx;
     RegisterX64 execdata = rbx;
-    RegisterX64 exectarget = r10;
 
     // Change closure
     build.mov(rax, qword[cip + offsetof(CallInfo, func)]);
     build.mov(rax, qword[rax + offsetof(TValue, value.gc)]);
     build.mov(sClosure, rax);
 
-    build.mov(proto, qword[rax + offsetof(Closure, l.p)]);
+    build.mov(proto, qword[cip + offsetof(CallInfo, p)]);
 
     build.mov(execdata, qword[proto + offsetof(Proto, execdata)]);
 
     build.test(byte[cip + offsetof(CallInfo, flags)], LUA_CALLINFO_NATIVE);
     build.jcc(ConditionX64::Zero, helpers.exitContinueVm); // Continue in interpreter if function has no native data
-
-    if (DFFlag::AddReturnExectargetCheck)
-    {
-        build.mov(exectarget, qword[proto + offsetof(Proto, exectarget)]);
-        build.test(exectarget, exectarget);
-        build.jcc(ConditionX64::Zero, helpers.exitContinueVmClearNativeFlag);
-    }
 
     // Change constants
     build.mov(rConstants, qword[proto + offsetof(Proto, k)]);
@@ -527,17 +517,41 @@ void emitReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers)
     // Get new instruction location and jump to it
     build.mov(edx, dword[execdata + rax]);
 
-    if (DFFlag::AddReturnExectargetCheck)
-    {
-        build.add(rdx, exectarget);
-    }
-    else
-    {
-        build.add(rdx, qword[proto + offsetof(Proto, exectarget)]);
-    }
+    build.add(rdx, qword[proto + offsetof(Proto, exectarget)]);
     build.jmp(rdx);
 }
 
+void emitDispatchLuauCall(AssemblyBuilderX64& build, ModuleHelpers& helpers)
+{
+    RegisterX64 proto = rcx; // Sync with emitContinueCallInVm
+    RegisterX64 ci = rdx;
+
+    build.mov(ci, qword[rState + offsetof(lua_State, ci)]);
+
+    // Switch current Closure (sClosure = ci->func->value.gc)
+    build.mov(rax, qword[ci + offsetof(CallInfo, func)]);
+    build.mov(rax, qword[rax + offsetof(TValue, value.gc)]);
+    build.mov(sClosure, rax);
+
+    build.mov(proto, qword[ci + offsetof(CallInfo, p)]);
+
+    // Switch current code
+    build.mov(rax, qword[proto + offsetof(Proto, code)]);
+    build.mov(sCode, rax);
+
+    // Switch current constants
+    build.mov(rConstants, qword[proto + offsetof(Proto, k)]);
+
+    // Get native function entry
+    build.mov(rax, qword[proto + offsetof(Proto, exectarget)]);
+    build.test(rax, rax);
+    build.jcc(ConditionX64::Zero, helpers.exitContinueVm);
+
+    // Mark call frame as native
+    build.or_(dword[ci + offsetof(CallInfo, flags)], LUA_CALLINFO_NATIVE);
+
+    build.jmp(rax);
+}
 
 } // namespace X64
 } // namespace CodeGen

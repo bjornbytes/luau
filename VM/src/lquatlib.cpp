@@ -3,6 +3,7 @@
 
 #include "lcommon.h"
 #include "lnumutils.h"
+#include "lobject.h"
 
 #include <math.h>
 #include <cstring>
@@ -41,10 +42,10 @@ static int quaternion_pack(lua_State* L)
 static int quaternion_unpack(lua_State* L)
 {
     const short* q = luaL_checkquaternion(L, 1);
-    float x = luaui_maxf(q[0] / 32767.f, -1.f);
-    float y = luaui_maxf(q[1] / 32767.f, -1.f);
-    float z = luaui_maxf(q[2] / 32767.f, -1.f);
-    float w = luaui_maxf(q[3] / 32767.f, -1.f);
+    float x = luai_maxf(q[0] / 32767.f, -1.f);
+    float y = luai_maxf(q[1] / 32767.f, -1.f);
+    float z = luai_maxf(q[2] / 32767.f, -1.f);
+    float w = luai_maxf(q[3] / 32767.f, -1.f);
     lua_pushnumber(L, x);
     lua_pushnumber(L, y);
     lua_pushnumber(L, z);
@@ -55,10 +56,10 @@ static int quaternion_unpack(lua_State* L)
 static int quaternion_conjugate(lua_State* L)
 {
     const short* q = luaL_checkquaternion(L, 1);
-    float x = luaui_maxf(q[0] / 32767.f, -1.f);
-    float y = luaui_maxf(q[1] / 32767.f, -1.f);
-    float z = luaui_maxf(q[2] / 32767.f, -1.f);
-    float w = luaui_maxf(q[3] / 32767.f, -1.f);
+    float x = luai_maxf(q[0] / 32767.f, -1.f);
+    float y = luai_maxf(q[1] / 32767.f, -1.f);
+    float z = luai_maxf(q[2] / 32767.f, -1.f);
+    float w = luai_maxf(q[3] / 32767.f, -1.f);
     lua_pushquaternion(L, -x, -y, -z, w);
     return 1;
 }
@@ -82,10 +83,10 @@ static int quaternion_angleaxis(lua_State* L)
 static int quaternion_toangleaxis(lua_State* L)
 {
     const short* q = luaL_checkquaternion(L, 1);
-    float x = luaui_maxf(q[0] / 32767.f, -1.f);
-    float y = luaui_maxf(q[1] / 32767.f, -1.f);
-    float z = luaui_maxf(q[2] / 32767.f, -1.f);
-    float w = luaui_maxf(q[3] / 32767.f, -1.f);
+    float x = luai_maxf(q[0] / 32767.f, -1.f);
+    float y = luai_maxf(q[1] / 32767.f, -1.f);
+    float z = luai_maxf(q[2] / 32767.f, -1.f);
+    float w = luai_maxf(q[3] / 32767.f, -1.f);
     float s = sqrtf(1.f - w * w);
     s = s < .0001f ? 1.f : 1.f / s;
     lua_pushnumber(L, 2.f * acosf(w));
@@ -122,10 +123,10 @@ static int quaternion_toeuler(lua_State* L)
 {
   const short* q = luaL_checkquaternion(L, 1);
 
-  float x = luaui_maxf(q[0] / 32767.f, -1.f);
-  float y = luaui_maxf(q[1] / 32767.f, -1.f);
-  float z = luaui_maxf(q[2] / 32767.f, -1.f);
-  float w = luaui_maxf(q[3] / 32767.f, -1.f);
+  float x = luai_maxf(q[0] / 32767.f, -1.f);
+  float y = luai_maxf(q[1] / 32767.f, -1.f);
+  float z = luai_maxf(q[2] / 32767.f, -1.f);
+  float w = luai_maxf(q[3] / 32767.f, -1.f);
 
   float unit = x * x + y * y + z * z + w * w;
   float test = x * w - y * z;
@@ -155,22 +156,22 @@ static int quaternion_toeuler(lua_State* L)
 
 static int quaternion_between(lua_State* L)
 {
-    const float* a = luaL_checkvector(L, 1);
-    const float* b = luaL_checkvector(L, 2);
+    const LUA_VECTOR_TYPE* a = luaL_checkvector(L, 1);
+    const LUA_VECTOR_TYPE* b = luaL_checkvector(L, 2);
 
-    float dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    LUA_VECTOR_TYPE dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-    if (dot > .99999f || dot < -.99999f) {
+    if (dot > LUA_VECTOR_TYPE(.99999) || dot < LUA_VECTOR_TYPE(-.99999)) {
       lua_pushquaternion(L, 0.f, 0.f, 0.f, 1.f);
       return 1;
     }
 
-    float x = a[1] * b[2] - a[2] * b[1];
-    float y = a[2] * b[0] - a[0] * b[2];
-    float z = a[0] * b[1] - a[1] * b[0];
-    float w = 1.f + dot;
+    LUA_VECTOR_TYPE x = a[1] * b[2] - a[2] * b[1];
+    LUA_VECTOR_TYPE y = a[2] * b[0] - a[0] * b[2];
+    LUA_VECTOR_TYPE z = a[0] * b[1] - a[1] * b[0];
+    LUA_VECTOR_TYPE w = 1.f + dot;
 
-    float length = sqrtf(x * x + y * y + z * z + w * w);
+    LUA_VECTOR_TYPE length = luai_sqrt(x * x + y * y + z * z + w * w);
 
     lua_pushquaternion(L, x / length, y / length, z / length, w / length);
 
@@ -267,10 +268,10 @@ static int quaternion_lookdir(lua_State* L)
 static int quaternion_direction(lua_State* L)
 {
     const short* q = luaL_checkquaternion(L, 1);
-    float qx = luaui_maxf(q[0] / 32767.f, -1.f);
-    float qy = luaui_maxf(q[1] / 32767.f, -1.f);
-    float qz = luaui_maxf(q[2] / 32767.f, -1.f);
-    float qw = luaui_maxf(q[3] / 32767.f, -1.f);
+    float qx = luai_maxf(q[0] / 32767.f, -1.f);
+    float qy = luai_maxf(q[1] / 32767.f, -1.f);
+    float qz = luai_maxf(q[2] / 32767.f, -1.f);
+    float qw = luai_maxf(q[3] / 32767.f, -1.f);
     float x = -2.f * qx * qz - 2.f * qw * qy;
     float y = -2.f * qy * qz + 2.f * qw * qx;
     float z = -1.f + 2.f * qx * qx + 2.f * qy * qy;
@@ -288,15 +289,15 @@ static int quaternion_slerp(lua_State* L)
     const short* r = luaL_checkquaternion(L, 2);
     float t = float(luaL_checknumber(L, 3));
 
-    float qx = luaui_maxf(q[0] / 32767.f, -1.f);
-    float qy = luaui_maxf(q[1] / 32767.f, -1.f);
-    float qz = luaui_maxf(q[2] / 32767.f, -1.f);
-    float qw = luaui_maxf(q[3] / 32767.f, -1.f);
+    float qx = luai_maxf(q[0] / 32767.f, -1.f);
+    float qy = luai_maxf(q[1] / 32767.f, -1.f);
+    float qz = luai_maxf(q[2] / 32767.f, -1.f);
+    float qw = luai_maxf(q[3] / 32767.f, -1.f);
 
-    float rx = luaui_maxf(r[0] / 32767.f, -1.f);
-    float ry = luaui_maxf(r[1] / 32767.f, -1.f);
-    float rz = luaui_maxf(r[2] / 32767.f, -1.f);
-    float rw = luaui_maxf(r[3] / 32767.f, -1.f);
+    float rx = luai_maxf(r[0] / 32767.f, -1.f);
+    float ry = luai_maxf(r[1] / 32767.f, -1.f);
+    float rz = luai_maxf(r[2] / 32767.f, -1.f);
+    float rw = luai_maxf(r[3] / 32767.f, -1.f);
 
     float dot = qx * rx + qy * ry + qz * rz + qw * rw;
 
@@ -369,7 +370,7 @@ static int quaternion_index(lua_State* L)
 
         if (unsigned(ic) < 4)
         {
-            lua_pushnumber(L, luaui_maxf(q[ic] / 32767.f, -1.f));
+            lua_pushnumber(L, luai_maxf(q[ic] / 32767.f, -1.f));
             return 1;
         }
     }
