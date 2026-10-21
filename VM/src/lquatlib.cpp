@@ -74,9 +74,13 @@ static int quaternion_angleaxis(lua_State* L)
     float s = sinf(angle * .5f);
     float c = cosf(angle * .5f);
     float length = sqrtf(ax * ax + ay * ay + az * az);
-    if (length > 0.f) s /= length;
+    if (length > 0.f) {
+        s /= length;
+        lua_pushquaternion(L, s * ax, s * ay, s * az, c);
+    } else {
+        lua_pushquaternion(L, 0.f, 0.f, 0.f, 1.f);
+    }
 
-    lua_pushquaternion(L, s * ax, s * ay, s * az, c);
     return 1;
 }
 
