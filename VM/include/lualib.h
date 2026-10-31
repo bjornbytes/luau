@@ -16,6 +16,7 @@ struct luaL_Reg
 typedef struct luaL_Reg luaL_Reg;
 
 LUALIB_API void luaL_register(lua_State* L, const char* libname, const luaL_Reg* l);
+LUALIB_API void luaL_setfuncs(lua_State* L, const luaL_Reg* l, int nup);
 LUALIB_API int luaL_getmetafield(lua_State* L, int obj, const char* e);
 LUALIB_API int luaL_callmeta(lua_State* L, int obj, const char* e);
 LUALIB_API l_noret luaL_typeerrorL(lua_State* L, int narg, const char* tname);
@@ -67,6 +68,9 @@ LUALIB_API const char* luaL_typename(lua_State* L, int idx);
 
 LUALIB_API void luaL_traceback(lua_State* L, lua_State* L1, const char* msg, int level);
 
+LUALIB_API int luaL_ref(lua_State* L, int t);
+LUALIB_API int luaL_unref(lua_State* L, int t, int ref);
+
 /*
 ** ===============================================================
 ** some useful macros
@@ -89,6 +93,8 @@ LUALIB_API void luaL_traceback(lua_State* L, lua_State* L1, const char* msg, int
 
 #define luaL_pushcfunction(L, fn, debugname) lua_pushcclosurek(L, fn, debugname, 0, NULL)
 #define luaL_pushcclosure(L, fn, debugname, nup) lua_pushcclosurek(L, fn, debugname, nup, NULL)
+
+#define luaL_newlib(L, funcs) (lua_newtable(L), luaL_setfuncs(L, funcs, 0))
 
 // generic buffer manipulation
 

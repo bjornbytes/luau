@@ -509,6 +509,7 @@ LUA_API int lua_unref(lua_State* L, int ref);
 #define lua_newuserdata(L, s) lua_newuserdatatagged(L, s, 0)
 
 #define lua_strlen(L, i) lua_objlen(L, (i))
+#define lua_rawlen(L, i) lua_objlen(L, (i))
 
 #define lua_isfunction(L, n) (lua_type(L, (n)) == LUA_TFUNCTION)
 #define lua_istable(L, n) (lua_type(L, (n)) == LUA_TTABLE)
@@ -535,6 +536,7 @@ LUA_API int lua_unref(lua_State* L, int ref);
 
 #define lua_setglobal(L, s) lua_setfield(L, LUA_GLOBALSINDEX, (s))
 #define lua_getglobal(L, s) lua_getfield(L, LUA_GLOBALSINDEX, (s))
+#define lua_pushglobaltable(L) lua_pushvalue(L, LUA_GLOBALSINDEX)
 
 #define lua_tostring(L, i) lua_tolstring(L, (i), NULL)
 

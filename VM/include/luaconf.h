@@ -94,6 +94,7 @@
 // buffer size used for on-stack string operations; this limit depends on native stack size
 #ifndef LUA_BUFFERSIZE
 #define LUA_BUFFERSIZE 512
+#define LUAL_BUFFERSIZE LUA_BUFFERSIZE
 #endif
 
 // number of valid Lua userdata tags

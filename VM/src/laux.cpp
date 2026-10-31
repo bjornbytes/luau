@@ -358,6 +358,19 @@ void luaL_register(lua_State* L, const char* libname, const luaL_Reg* l)
     }
 }
 
+void luaL_setfuncs(lua_State* L, const luaL_Reg* l, int nup)
+{
+    luaL_checkstack(L, nup, "too many upvalues");
+    for (; l->name != NULL; l++)
+    {
+        for (int i = 0; i < nup; i++)
+            lua_pushvalue(L, -nup);
+        lua_pushcclosure(L, l->func, nup);
+        lua_setfield(L, -(nup + 2), l->name);
+    }
+    lua_pop(L, nup);
+}
+
 const char* luaL_findtable(lua_State* L, int idx, const char* fname, int szhint)
 {
     const char* e;
@@ -438,6 +451,18 @@ void luaL_traceback(lua_State* L, lua_State* L1, const char* msg, int level)
     }
 
     luaL_pushresult(&buf);
+}
+
+int luaL_ref(lua_State* L, int t)
+{
+    int ref = lua_ref(L, -1);
+    lua_pop(L, 1);
+    return ref;
+}
+
+int luaL_unref(lua_State* L, int t, int ref)
+{
+    return lua_unref(L, ref);
 }
 
 
